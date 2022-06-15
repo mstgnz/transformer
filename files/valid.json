@@ -14,16 +14,22 @@
         "image": "nginx",
         "ports": [
           {
-            "containerPort": 80
+            "containerPort": 80,
+            "ports": [34,55],
+            "status": ["on","off"]
           }
         ]
       },
       {
         "name": "rss-reader",
-        "image": "nickchase/rss-php-nginx:v1",
+        "image": "a/rss-php-nginx:v1",
         "ports": [
           {
-            "containerPort": 88
+            "containerPort": 0.23,
+            "test": [
+              [23,334],
+              ["old","new"]
+            ]
           }
         ]
       }

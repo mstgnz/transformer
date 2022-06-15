@@ -6,21 +6,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func isYaml(by []byte) bool {
-	return yaml.Unmarshal(by, &typeMap) == nil
+func isYaml(doc []byte) bool {
+	return yaml.Unmarshal(doc, &typeMap) == nil
 }
 
-func parseYaml(b []byte) error {
+func parseYaml(doc []byte) error {
 
 	// Decode File
-	var node any
-	err := yaml.Unmarshal(b, &node)
+	var test any
+	err := yaml.Unmarshal(doc, &test)
 	errorHandle(err)
 
 	// Encode
 	enc := yaml.NewEncoder(os.Stdout)
 	enc.SetIndent(2)
-	err = enc.Encode(node)
+	err = enc.Encode(test)
 	errorHandle(err)
 
 	return nil

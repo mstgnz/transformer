@@ -4,6 +4,6 @@ import (
 	"encoding/xml"
 )
 
-func isXml(by []byte) bool {
-	return xml.Unmarshal(by, &typeMap) == nil
+func isXml(doc []byte) bool {
+	return xml.Unmarshal(doc, &typeMap) == nil
 }

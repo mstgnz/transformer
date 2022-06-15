@@ -17,10 +17,12 @@ var (
 	typeMap   map[string]any
 	typeArr   []any
 	valFormat reflect.Type
+	doc       []byte
 )
 
 func main() {
 
+	// Get args and check file
 	getArgsAndCheckFile()
 
 	// Node
@@ -89,22 +91,23 @@ func getArgsAndCheckFile() {
 	fmt.Printf("%v %v %v %v %v %v\n", color.RedString("This"), color.YellowString(*file), color.RedString("file are starting to convert from"), color.YellowString(*from), color.RedString("to"), color.YellowString(*to))
 
 	// Read File
-	by, err := ioutil.ReadFile(*file)
+	bytes, err := ioutil.ReadFile(*file)
+	doc = bytes
 	errorHandle(err)
 
 	switch *from {
 	case "json":
-		if !isJSON(by) {
+		if !isJSON(doc) {
 			fmt.Printf("You said you gave json but this file is not json.\nYour load file: %v", *file)
 			os.Exit(0)
 		}
 	case "yaml":
-		if !isYaml(by) {
+		if !isYaml(doc) {
 			fmt.Printf("You said you gave yaml but this file is not yaml.\nYour load file: %v", *file)
 			os.Exit(0)
 		}
 	case "xml":
-		if !isXml(by) {
+		if !isXml(doc) {
 			fmt.Printf("You said you gave xml but this file is not xml.\nYour load file: %v", *file)
 			os.Exit(0)
 		}
