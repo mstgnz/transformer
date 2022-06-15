@@ -14,13 +14,21 @@
 			<image>nginx</image>
 			<ports>
 				<containerPort>80</containerPort>
+				<ports>34</ports>
+				<ports>55</ports>
+				<status>on</status>
+				<status>off</status>
 			</ports>
 		</containers>
 		<containers>
 			<name>rss-reader</name>
-			<image>nickchase/rss-php-nginx:v1</image>
+			<image>a/rss-php-nginx:v1</image>
 			<ports>
-				<containerPort>88</containerPort>
+				<containerPort>0.23</containerPort>
+				<test>23</test>
+				<test>334</test>
+				<test>old</test>
+				<test>new</test>
 			</ports>
 		</containers>
 	</spec>

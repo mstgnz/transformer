@@ -91,7 +91,7 @@ func (node *linear) Delete(key string) {
 // Print data
 func (node *linear) Print() {
 	iter := node
-	for iter != nil {
+	for iter != nil && len(iter.key) > 0 {
 		value := reflect.ValueOf(iter.value).String()
 		if reflect.TypeOf(iter.value) == nil {
 			value = reflect.Invalid.String()
