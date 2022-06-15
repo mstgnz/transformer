@@ -28,11 +28,11 @@ func main() {
 
 	// Check Flags
 	if len(*file) == 0 || len(*from) == 0 || len(*to) == 0 {
-		fmt.Printf("Usage:\t--file	: choose file path\n\t--from	: current file format (yaml-json-xml)\n\t--to	: convert file format (yaml-json-xml)\n")
+		fmt.Printf("Usage:\t--file: choose file path\n\t--from: current file format (yaml-json-xml)\n\t--to: convert file format (yaml-json-xml)\n")
 		os.Exit(0)
 	}
 	// Info
-	fmt.Print(color.RedString("This %v convert from %v to %v\n", *file, *from, *to))
+	fmt.Print(color.YellowString("This %v convert from %v to %v\n", *file, *from, *to))
 
 	// Read File
 	by, err := ioutil.ReadFile(*file)
