@@ -91,7 +91,7 @@ func (node *linear) Delete(key string) {
 func (node *linear) Print() {
 	iter := node
 	for iter != nil {
-		fmt.Printf("Key: %v, Value: %v, ValueKind: %v\n", color.YellowString(iter.key), color.YellowString(iter.valueKind), color.YellowString(iter.valueKind))
+		fmt.Printf("Key: %v, Value: %v, ValueKind: %v\n", color.YellowString(iter.key), color.YellowString(iter.value), color.YellowString(iter.valueKind))
 		iter = iter.next
 	}
 }
