@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+	<apiVersion>v1</apiVersion>
+	<kind>Pod</kind>
+	<metadata>
+		<name>rss-site</name>
+		<labels>
+			<app>web</app>
+		</labels>
+	</metadata>
+	<spec
+		<containers>
+			<name>front-end</name>
+			<image>nginx</image>
+			<ports>
+				<containerPort>80</containerPort>
+			</ports>
+		</containers>
+		<containers>
+			<name>rss-reader</name>
+			<image>nickchase/rss-php-nginx:v1</image>
+			<ports>
+				<containerPort>88</containerPort>
+			</ports>
+		</containers>
+	</spec>
+</root>
