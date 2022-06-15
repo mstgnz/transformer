@@ -31,8 +31,8 @@ func main() {
 		fmt.Printf("Usage:\t--file: choose file path\n\t--from: current file format (yaml-json-xml)\n\t--to: convert file format (yaml-json-xml)\n")
 		os.Exit(0)
 	}
-	// Info
-	fmt.Print(color.YellowString("This %v convert from %v to %v\n", *file, *from, *to))
+	// Info message
+	fmt.Printf("%v %v %v %v %v %v\n", color.RedString("This"), color.YellowString(*file), color.RedString("file are starting to convert from"), color.YellowString(*from), color.RedString("to"), color.YellowString(*to))
 
 	// Read File
 	by, err := ioutil.ReadFile(*file)
