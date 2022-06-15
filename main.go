@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	node    ILinear
-	typeMap map[string]any
-	typeArr []any
+	node      ILinear
+	typeMap   map[string]any
+	typeArr   []any
+	valFormat reflect.Type
 )
 
 func main() {
@@ -67,42 +68,40 @@ func main() {
 }
 
 func recursive(typeMap map[string]any) {
-	valFormat, valStr := "", ""
+	valStr := ""
 	for key, val := range typeMap {
-		valFormat = fmt.Sprintf("%T", val)
+		valFormat = reflect.TypeOf(val)
 		valStr = fmt.Sprintf("%v", val)
-
-		if valFormat != "map[string]interface {}" && valFormat != "[]interface {}" {
+		if valFormat.Kind().String() != "map" && valFormat.Kind().String() != "slice" {
 			node.AddToEnd(key, valStr, valFormat)
-		} else if valFormat == "map[string]interface {}" {
+		} else if valFormat.String() == "map[string]interface {}" {
 			convert, err := json.Marshal(val)
 			errorHandle(err)
 			typeMap = make(map[string]any)
 			err = json.Unmarshal(convert, &typeMap)
 			errorHandle(err)
-			node.AddToEnd(key, "", valFormat)
+			node.AddToEnd(key, nil, valFormat)
 			recursive(typeMap)
-		} else if valFormat == "[]interface {}" {
+		} else if valFormat.String() == "[]interface {}" {
 			convert, err := json.Marshal(val)
 			errorHandle(err)
 			err = json.Unmarshal(convert, &typeArr)
 			errorHandle(err)
-			node.AddToEnd(key, "", valFormat)
+			node.AddToEnd(key, nil, valFormat)
 			recursive1(typeArr)
 		}
 	}
 }
 
 func recursive1(typeArr []any) {
-	valFormat := ""
 	for key, val := range typeArr {
-		valFormat = reflect.TypeOf(val).String()
-		if valFormat == "map[string]interface {}" {
+		valFormat = reflect.TypeOf(val)
+		if valFormat.String() == "map[string]interface {}" {
 			convert, err := json.Marshal(val)
 			typeMap = make(map[string]any)
 			err = json.Unmarshal(convert, &typeMap)
 			errorHandle(err)
-			node.AddToEnd(strconv.Itoa(key), "", valFormat)
+			node.AddToEnd(strconv.Itoa(key), nil, valFormat)
 			recursive(typeMap)
 		}
 	}

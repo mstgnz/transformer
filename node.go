@@ -2,22 +2,23 @@ package main
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/fatih/color"
 )
 
 type ILinear interface {
-	AddToStart(key, value, valueKind string)
-	AddToAfter(key, value, valueKind, which string)
-	AddToEnd(key, value, valueKind string)
+	AddToStart(key string, value any, valueKind reflect.Type)
+	AddToAfter(key string, value any, valueKind reflect.Type, which string)
+	AddToEnd(key string, value any, valueKind reflect.Type)
 	Delete(Key string)
 	Print()
 }
 
 type linear struct {
 	key       string
-	value     string
-	valueKind string
+	value     any
+	valueKind reflect.Type
 	next      *linear
 }
 
@@ -26,16 +27,16 @@ func Linear() ILinear {
 }
 
 // AddToStart data
-func (node *linear) AddToStart(key, value, valueKind string) {
+func (node *linear) AddToStart(key string, value any, valueKind reflect.Type) {
 	temp := *node
 	node.key = key
-	node.valueKind = value
+	node.value = value
 	node.valueKind = valueKind
 	node.next = &temp
 }
 
 // AddToAfter data
-func (node *linear) AddToAfter(key, value, valueKind, whichKey string) {
+func (node *linear) AddToAfter(key string, value any, valueKind reflect.Type, whichKey string) {
 	iter := node
 	for iter.key != whichKey && iter.next != nil {
 		iter = iter.next
@@ -50,11 +51,11 @@ func (node *linear) AddToAfter(key, value, valueKind, whichKey string) {
 }
 
 // AddToEnd data
-func (node *linear) AddToEnd(key, value, valueKind string) {
+func (node *linear) AddToEnd(key string, value any, valueKind reflect.Type) {
 	iter := node
-	if iter.next == nil && len(iter.key) == 0 && len(iter.valueKind) == 0 {
+	if iter.next == nil && len(iter.key) == 0 {
 		iter.key = key
-		iter.valueKind = value
+		iter.value = value
 		iter.valueKind = valueKind
 	} else {
 		for iter.next != nil {
@@ -91,7 +92,11 @@ func (node *linear) Delete(key string) {
 func (node *linear) Print() {
 	iter := node
 	for iter != nil {
-		fmt.Printf("Key: %v, Value: %v, ValueKind: %v\n", color.YellowString(iter.key), color.YellowString(iter.value), color.YellowString(iter.valueKind))
+		value := reflect.ValueOf(iter.value).String()
+		if reflect.TypeOf(iter.value) == nil {
+			value = reflect.Invalid.String()
+		}
+		fmt.Printf("Key: %v, Value: %v, ValueKind: %v\n", color.YellowString(iter.key), color.YellowString(value), color.YellowString(iter.valueKind.String()))
 		iter = iter.next
 	}
 }
