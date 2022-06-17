@@ -14,8 +14,8 @@
 			<image>nginx</image>
 			<ports>
 				<containerPort>80</containerPort>
-				<ports>34</ports>
-				<ports>55</ports>
+				<port>34</port>
+				<port>55</port>
 				<status>on</status>
 				<status>off</status>
 			</ports>

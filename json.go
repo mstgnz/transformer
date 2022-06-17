@@ -2,17 +2,123 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"reflect"
+	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
+)
+
+var (
+	valFormat reflect.Type
+	typeArr   []any
+	typeMap   map[string]any
 )
 
 func isJSON(doc []byte) bool {
 	return json.Unmarshal(doc, &typeMap) == nil
 }
 
-// jsonReadByte just test code
+func jsonDecode(doc []byte) error {
+	dec := json.NewDecoder(strings.NewReader(string(doc)))
+	var (
+		key     string
+		types   string
+		typeVal string
+	)
+	for {
+		t, err := dec.Token()
+		if err == io.EOF && err != nil {
+			return errors.Wrap(err, "no more")
+		}
+		types = reflect.TypeOf(t).String()
+		typeVal = fmt.Sprintf("%v", t)
+		//fmt.Printf("%T -> %v\n", t, t)
+		// set key
+		if types == "string" && key == "" {
+			key = typeVal
+			continue
+		}
+		// set val
+		if types == "string" && key != "" {
+			node.AddToEnd(key, reflect.ValueOf(t).String())
+			key = ""
+			continue
+		}
+		// json.Delim
+		if types == "json.Delim" && node.Exists() {
+			// set open object - {
+			if typeVal == "{" {
+				node.AddToEnd(key, typeVal)
+				key = ""
+				continue
+			}
+			// set close object - }
+			if typeVal == "}" {
+				node.AddToEnd(key, typeVal)
+				key = ""
+				continue
+			}
+			// set open array - [
+			if typeVal == "[" && key != "" {
+				node.AddToEnd(key, typeVal)
+				key = ""
+				continue
+			}
+			// set close array - ]
+			if typeVal == "]" {
+				node.AddToEnd(key, typeVal)
+				key = ""
+				continue
+			}
+		}
+	}
+}
+
+// json Unmarshal for map but map is unordered
+func jsonRecursive(typeMap map[string]any) {
+	valStr := ""
+	for key, val := range typeMap {
+		valFormat = reflect.TypeOf(val)
+		valStr = fmt.Sprintf("%v", val)
+		if valFormat.Kind().String() != "map" && valFormat.Kind().String() != "slice" {
+			node.AddToEnd(key, valStr)
+		} else if valFormat.String() == "map[string]interface {}" {
+			convert, err := json.Marshal(val)
+			errorHandle(err)
+			typeMap = make(map[string]any)
+			err = json.Unmarshal(convert, &typeMap)
+			errorHandle(err)
+			node.AddToEnd(key, nil)
+			jsonRecursive(typeMap)
+		} else if valFormat.String() == "[]interface {}" {
+			convert, err := json.Marshal(val)
+			errorHandle(err)
+			err = json.Unmarshal(convert, &typeArr)
+			errorHandle(err)
+			node.AddToEnd(key, nil)
+			jsonSubRecursive(typeArr)
+		}
+	}
+}
+
+func jsonSubRecursive(typeArr []any) {
+	for key, val := range typeArr {
+		valFormat = reflect.TypeOf(val)
+		if valFormat.String() == "map[string]interface {}" {
+			convert, err := json.Marshal(val)
+			typeMap = make(map[string]any)
+			err = json.Unmarshal(convert, &typeMap)
+			errorHandle(err)
+			node.AddToEnd(strconv.Itoa(key), nil)
+			jsonRecursive(typeMap)
+		}
+	}
+}
+
+// jsonReadByte just test code for byte read
 func jsonReadByte(doc []byte) error {
 	var j json.RawMessage
 	err := json.Unmarshal(doc, &j)
@@ -27,7 +133,6 @@ func jsonReadByte(doc []byte) error {
 	intVal := false
 	key, val := "", ""
 	// We will render the json object as key and value by looping over the byte array with a single loop.
-	// Because I couldn't find an example decoded as key value in go programming language.
 	for _, v := range j {
 		// except for the spaces
 		if v != 32 && v != 10 {
@@ -118,11 +223,11 @@ func jsonReadByte(doc []byte) error {
 	if len(keySlice) == len(valSlice) {
 		for i := 0; i < len(keySlice); i++ {
 			if valSlice[i] == "array" {
-				node.AddToEnd(keySlice[i], nil, reflect.TypeOf([]any{}))
+				node.AddToEnd(keySlice[i], nil)
 			} else if valSlice[i] == "object" {
-				node.AddToEnd(keySlice[i], nil, reflect.TypeOf(map[string]any{}))
+				node.AddToEnd(keySlice[i], nil)
 			} else {
-				node.AddToEnd(keySlice[i], valSlice[i], reflect.TypeOf("string"))
+				node.AddToEnd(keySlice[i], valSlice[i])
 			}
 		}
 	} else {

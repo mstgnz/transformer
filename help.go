@@ -10,6 +10,7 @@ func errorHandle(err error) {
 	}
 }
 
+// generic func for array contains any type
 func contains[T comparable](s []T, e T) bool {
 	for _, v := range s {
 		if v == e {
