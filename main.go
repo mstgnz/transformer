@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 )
 
@@ -20,10 +19,9 @@ func main() {
 	}
 
 	// Fill Node
-	node, err := jsonDecode(doc)
+	knot, err := jsonDecode(doc)
 	if err != nil {
 		log.Println(err.Error())
 	}
-	node.Print()
-	fmt.Println(node.GetNodeObj("spec").next)
+	knot.Print(nil)
 }

@@ -14,86 +14,71 @@ func isJSON(doc []byte) bool {
 	return json.Unmarshal(doc, new(map[string]any)) == nil
 }
 
-func jsonDecode(doc []byte) (IJsonLinear, error) {
-	node := JsonLinear()
+func jsonDecode(doc []byte) (*node, error) {
+	var (
+		knot   *node
+		parent *node
+	)
 	dec := json.NewDecoder(strings.NewReader(string(doc)))
 	var (
-		key        string
-		types      string
-		typeVal    string
-		object     []string
-		objectName string
-		arrCount   int
+		key      string
+		types    string
+		typeVal  string
+		isObj    bool
+		arrCount int
 	)
 	for {
 		t, err := dec.Token()
 		if err == io.EOF && err != nil {
-			return node, errors.Wrap(err, "no more")
+			return knot, errors.Wrap(err, "no more")
 		}
 		types = reflect.TypeOf(t).String()
 		typeVal = fmt.Sprintf("%v", t)
-		// get object name
-		if len(object) > 0 {
-			objectName = object[len(object)-1:][0]
-		}
 		// json.Delim
 		if types == "json.Delim" {
+			if !knot.Exists() {
+				continue
+			}
 			switch typeVal {
 			case "{": // set open object - {
-				object = append(object, key)
-				if arrCount > 0 {
-					node.GetNodeObj(objectName).AppendArr(&jsonLinear{})
-					continue
-				}
-				if objectName == "" {
-					node.AddToObj(key)
-				} else {
-					node.GetNodeObj(objectName).AddToObj(key)
-				}
+				knot = knot.AddToNext(knot, parent, key, &node{})
+				parent = knot
+				isObj = !isObj
 				key = ""
 			case "[": // set open array - [
 				if key != "" {
-					object = append(object, key)
-					if objectName == "" {
-						node.AddToArr(key)
-					} else {
-						node.GetNodeObj(objectName).AddToArr(key)
-					}
+					knot = knot.AddToNext(knot, parent, key, nil)
 					key = ""
-				} else {
-					if arrCount > 0 {
-						node.GetNodeObj(objectName).AppendArr([]any{})
-					}
 				}
 				arrCount++
 			default: // set close object and array - } - ]
-				if len(object) > 0 {
-					object = object[:len(object)-1]
-				}
 				if typeVal == "]" {
 					arrCount--
 				}
+				if typeVal == "}" {
+					parent = nil
+					if knot.parent != nil {
+						knot = knot.parent
+					}
+				}
 			}
 			continue
-		}
-		// isArr
-		if arrCount > 0 {
-			node.GetNodeObj(objectName).AppendArr(t)
-			continue
-		}
-		// set key
-		if key == "" {
-			key = typeVal
-			continue
-		}
-		// set val
-		if key != "" {
-			if objectName == "" {
-				node.AddToStr(key, typeVal)
-			} else {
-				node.GetNodeObj(objectName).AddToStr(key, typeVal)
+		} else {
+			// set key
+			if key == "" {
+				key = typeVal
+				continue
 			}
-			key = ""
+			// set val
+			if key != "" {
+				if isObj {
+					knot = knot.AddToValue(knot, parent, key, typeVal)
+					isObj = !isObj
+				} else {
+					knot = knot.AddToNext(knot, parent, key, typeVal)
+				}
+				key = ""
+			}
 		}
 	}
 }
