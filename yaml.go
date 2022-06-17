@@ -7,7 +7,7 @@ import (
 )
 
 func isYaml(doc []byte) bool {
-	return yaml.Unmarshal(doc, &typeMap) == nil
+	return yaml.Unmarshal(doc, new(map[string]any)) == nil
 }
 
 func parseYaml(doc []byte) error {

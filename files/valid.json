@@ -10,7 +10,16 @@
   "spec": {
     "containers": [
       {
-        "name": "front-end",
+        "name": "developer",
+        "developer": {
+          "backend": ["golang","java","python"],
+          "frontend": ["angular","javascript", {"test": "test"}],
+          "test": [
+            {"unit": "meter"},
+            {"price": 343.32},
+            {"discount": [11,57]}
+          ]
+        },
         "image": "nginx",
         "ports": [
           {

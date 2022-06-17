@@ -1,14 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"log"
 )
 
 //Since it is known from which format the file will be converted
 //to which format when the program is run, base definitions are made here.
 var (
-	node ILinear
-	doc  []byte
+	doc []byte
 )
 
 func main() {
@@ -19,16 +19,11 @@ func main() {
 		log.Println(err.Error())
 	}
 
-	// Node start
-	node = Linear()
-
 	// Fill Node
-	//jsonRecursive(typeMap)
-
-	err = jsonDecode(doc)
+	node, err := jsonDecode(doc)
 	if err != nil {
 		log.Println(err.Error())
 	}
-
 	node.Print()
+	fmt.Println(node.GetNodeObj("spec").next)
 }
