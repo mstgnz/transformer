@@ -1,24 +1,14 @@
 {
+  "appName": "transformer",
   "apiVersion": "v1",
-  "kind": "Pod",
   "metadata": {
-    "name": "rss-site",
+    "name": "golang",
     "labels": {
-      "app": "web"
+      "app": "web and command line"
     }
   },
-  "spec": {
-    "name": "test",
-    "arr": [
-      "asa",
-      33,
-      [15,45.5],
-      {
-        "test":"try",
-        "try": "test"
-      }
-    ],
-    "last": "try"
-  },
-  "finish": "doc"
+  "development": {
+    "backend": "golang",
+    "frontend": "angular"
+  }
 }
