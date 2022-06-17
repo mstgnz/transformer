@@ -1,0 +1,24 @@
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "rss-site",
+    "labels": {
+      "app": "web"
+    }
+  },
+  "spec": {
+    "name": "test",
+    "arr": [
+      "asa",
+      33,
+      [15,45.5],
+      {
+        "test":"try",
+        "try": "test"
+      }
+    ],
+    "last": "try"
+  },
+  "finish": "doc"
+}
