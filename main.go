@@ -24,4 +24,5 @@ func main() {
 		log.Println(err.Error())
 	}
 	knot.Print(nil)
+	//fmt.Println(convertToNode(convertToSlice(convertToNode(knot.value).next.value)[6]).prev)
 }

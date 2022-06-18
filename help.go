@@ -19,3 +19,15 @@ func contains[T comparable](s []T, e T) bool {
 	}
 	return false
 }
+
+// convert to node
+func convertToNode(value any) *node {
+	knot, _ := value.(*node)
+	return knot
+}
+
+// convert to any slice
+func convertToSlice(value any) []any {
+	slc, _ := value.([]any)
+	return slc
+}

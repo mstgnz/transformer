@@ -13,6 +13,9 @@
       "test",343,["try",55.42],
       {
         "nested": "for array"
+      },
+      {
+        "nes": "ted"
       }
     ],
     "test": 45

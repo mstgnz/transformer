@@ -34,6 +34,13 @@ func (n *node) AddToValue(knot *node, parent *node, key string, value any) *node
 	return knot
 }
 
+// SetToValue data
+func (n *node) SetToValue(knot *node, key string, value any) *node {
+	knot.key = key
+	knot.value = value
+	return knot
+}
+
 // AddToArr data
 func (n *node) AddToArr(knot *node, value any) *node {
 	arr, ok := knot.value.([]any)
