@@ -18,11 +18,15 @@ func main() {
 		log.Println(err.Error())
 	}
 
-	// Fill Node
-	knot, err := jsonDecode(doc)
+	// Fill Node for Json
+	//knot, err := jsonDecode(doc)
+
+	// Fill Node for Xml
+	knot, err := xmlDecode(doc)
 	if err != nil {
 		log.Println(err.Error())
 	}
 	knot.Print(nil)
 	//fmt.Println(convertToNode(convertToSlice(convertToNode(knot.value).next.value)[6]).prev)
+
 }

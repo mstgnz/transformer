@@ -63,6 +63,9 @@ func (n *node) AddObjToArr(knot *node) *node {
 // Print data
 func (n *node) Print(knot *node) {
 	iter := n
+	if iter == nil && knot == nil {
+		return
+	}
 	if knot == nil {
 		for iter.prev != nil {
 			iter = iter.prev
@@ -72,23 +75,23 @@ func (n *node) Print(knot *node) {
 	}
 	for iter != nil {
 		n.print(iter)
+		// if node value is object
 		obj, ok := iter.value.(*node)
 		if ok {
 			fmt.Println("child for", iter.key)
 			n.Print(obj)
 		}
+		// TODO if the node value is slice and one of the slice value is an object
 		iter = iter.next
 	}
 }
 
 func (n *node) print(iter *node) {
-	fmt.Printf("%v %v, %v %v, %v %v\n",
+	fmt.Printf("%v %v, %v %v\n",
 		color.YellowString("Key: "),
 		iter.key,
 		color.YellowString("Value:"),
-		iter.value,
-		color.YellowString("Parent:"),
-		iter.parent)
+		iter.value)
 }
 
 // Exists node

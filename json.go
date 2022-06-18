@@ -14,6 +14,7 @@ func isJSON(doc []byte) bool {
 	return json.Unmarshal(doc, new(map[string]any)) == nil
 }
 
+// jsonDecode
 func jsonDecode(doc []byte) (*node, error) {
 	var (
 		knot   *node
