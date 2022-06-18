@@ -8,16 +8,14 @@
     }
   },
   "development": {
-    "price": 33.61,
     "arr": [
-      "test",343,["try",55.42],
+      234,"434",
       {
-        "nested": "for array"
+        "sd": 34
       },
       {
-        "nes": "ted"
+        "435": 43
       }
-    ],
-    "test": 45
+    ]
   }
 }
