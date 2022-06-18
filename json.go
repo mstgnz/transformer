@@ -77,7 +77,7 @@ func jsonDecode(doc []byte) (*node, error) {
 		} else {
 			// set key
 			if key == "" {
-				if arrCount > 0 && !objStart {
+				if arrCount > 0 {
 					knot.AddToArr(knot, typeVal)
 					continue
 				}

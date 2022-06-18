@@ -93,5 +93,5 @@ func (n *node) print(iter *node) {
 
 // Exists node
 func (n *node) Exists() bool {
-	return n != nil && n.key != ""
+	return n != nil
 }
