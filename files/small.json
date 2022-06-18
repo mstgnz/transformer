@@ -8,7 +8,13 @@
     }
   },
   "development": {
-    "backend": "golang",
-    "frontend": "angular"
+    "price": 33.61,
+    "arr": [
+      "test",343,["try",55.42],
+      {
+        "nested": "for array"
+      }
+    ],
+    "test": 45
   }
 }

@@ -34,6 +34,25 @@ func (n *node) AddToValue(knot *node, parent *node, key string, value any) *node
 	return knot
 }
 
+// AddToArr data
+func (n *node) AddToArr(knot *node, value any) *node {
+	arr, ok := knot.value.([]any)
+	if ok {
+		knot.value = append(arr, value)
+	}
+	return knot
+}
+
+// AddObjToArr data
+func (n *node) AddObjToArr(knot *node) *node {
+	newObj := &node{prev: knot, parent: knot}
+	arr, ok := knot.value.([]any)
+	if ok {
+		knot.value = append(arr, newObj)
+	}
+	return newObj
+}
+
 // Print data
 func (n *node) Print(knot *node) {
 	iter := n
@@ -48,6 +67,7 @@ func (n *node) Print(knot *node) {
 		n.print(iter)
 		obj, ok := iter.value.(*node)
 		if ok {
+			fmt.Println("child for", iter.key)
 			n.Print(obj)
 		}
 		iter = iter.next

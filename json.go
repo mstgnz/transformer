@@ -24,7 +24,7 @@ func jsonDecode(doc []byte) (*node, error) {
 		key      string
 		types    string
 		typeVal  string
-		isObj    bool
+		objStart bool
 		arrCount int
 	)
 	for {
@@ -41,14 +41,25 @@ func jsonDecode(doc []byte) (*node, error) {
 			}
 			switch typeVal {
 			case "{": // set open object - {
-				knot = knot.AddToNext(knot, parent, key, &node{})
+				if arrCount > 0 {
+					fmt.Println(knot)
+					knot = knot.AddObjToArr(knot)
+				} else {
+					knot = knot.AddToNext(knot, parent, key, &node{})
+				}
 				parent = knot
-				isObj = !isObj
+				objStart = true
 				key = ""
 			case "[": // set open array - [
 				if key != "" {
-					knot = knot.AddToNext(knot, parent, key, nil)
+					if objStart {
+						knot = knot.AddToValue(knot, parent, key, []any{})
+					} else {
+						knot = knot.AddToNext(knot, parent, key, []any{})
+					}
 					key = ""
+				} else {
+					knot.AddToArr(knot, typeVal)
 				}
 				arrCount++
 			default: // set close object and array - } - ]
@@ -56,9 +67,11 @@ func jsonDecode(doc []byte) (*node, error) {
 					arrCount--
 				}
 				if typeVal == "}" {
-					parent = nil
 					if knot.parent != nil {
 						knot = knot.parent
+						parent = knot
+					} else {
+						parent = nil
 					}
 				}
 			}
@@ -66,14 +79,18 @@ func jsonDecode(doc []byte) (*node, error) {
 		} else {
 			// set key
 			if key == "" {
+				if arrCount > 0 {
+					knot.AddToArr(knot, typeVal)
+					continue
+				}
 				key = typeVal
 				continue
 			}
 			// set val
 			if key != "" {
-				if isObj {
+				if objStart {
 					knot = knot.AddToValue(knot, parent, key, typeVal)
-					isObj = !isObj
+					objStart = false
 				} else {
 					knot = knot.AddToNext(knot, parent, key, typeVal)
 				}
