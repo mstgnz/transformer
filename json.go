@@ -30,7 +30,7 @@ func jsonDecode(doc []byte) (*node, error) {
 	)
 	for {
 		t, err := dec.Token()
-		if err == io.EOF && err != nil {
+		if err == io.EOF || err != nil {
 			return knot, errors.Wrap(err, "no more")
 		}
 		types = reflect.TypeOf(t).String()
@@ -62,19 +62,17 @@ func jsonDecode(doc []byte) (*node, error) {
 					knot.AddToArr(knot, typeVal)
 				}
 				arrCount++
-			default: // set close object and array - } - ]
-				if typeVal == "]" {
-					arrCount--
+			case "]": // set close array
+				arrCount--
+			case "}": // set close object
+				parent = nil
+				if knot.parent != nil {
+					knot = knot.parent
+					parent = knot
 				}
-				if typeVal == "}" {
-					parent = nil
-					if knot.parent != nil {
-						knot = knot.parent
-						parent = knot
-					}
-				}
+			default:
+				fmt.Println("default not set -> ", t)
 			}
-			continue
 		} else {
 			// set key
 			if key == "" {
@@ -83,10 +81,7 @@ func jsonDecode(doc []byte) (*node, error) {
 					continue
 				}
 				key = typeVal
-				continue
-			}
-			// set val
-			if key != "" {
+			} else { // set val
 				if objStart {
 					if arrCount > 0 {
 						knot.SetToValue(knot, key, typeVal)

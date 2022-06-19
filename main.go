@@ -18,10 +18,13 @@ func main() {
 		log.Println(err.Error())
 	}
 
-	// Fill Node for Json
+	// jsonDecode
 	//knot, err := jsonDecode(doc)
 
-	// Fill Node for Xml
+	// yamlDecode
+	//knot, err := yamlDecode(doc)
+
+	// xmlDecode
 	knot, err := xmlDecode(doc)
 	if err != nil {
 		log.Println(err.Error())
