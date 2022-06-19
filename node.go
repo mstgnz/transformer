@@ -87,11 +87,11 @@ func (n *node) Print(knot *node) {
 	for iter != nil {
 		n.print(iter)
 		// if node value is object
-		obj, ok := iter.value.(*node)
+		/*obj, ok := iter.value.(*node)
 		if ok {
 			fmt.Println("child for", iter.key)
 			n.Print(obj)
-		}
+		}*/
 		// TODO if the node value is slice and one of the slice value is an object
 		iter = iter.next
 	}
