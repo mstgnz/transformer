@@ -10,18 +10,22 @@ func isYaml(doc []byte) bool {
 	return yaml.Unmarshal(doc, new(map[string]any)) == nil
 }
 
-func parseYaml(doc []byte) error {
+func yamlDecode(doc []byte) (*node, error) {
+	var (
+		knot *node
+		//parent *node
+	)
 
 	// Decode File
-	var test any
+	var test yaml.Node
 	err := yaml.Unmarshal(doc, &test)
 	errorHandle(err)
 
 	// Encode
 	enc := yaml.NewEncoder(os.Stdout)
 	enc.SetIndent(2)
-	err = enc.Encode(test)
+	err = enc.Encode(test.Content[0])
 	errorHandle(err)
 
-	return nil
+	return knot, nil
 }

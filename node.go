@@ -9,6 +9,7 @@ import (
 type node struct {
 	key    string
 	value  any
+	attr   map[string]string
 	next   *node
 	prev   *node
 	parent *node
@@ -21,6 +22,16 @@ func (n *node) AddToNext(knot *node, parent *node, key string, value any) *node 
 		return knot
 	}
 	knot.next = &node{key: key, value: value, next: nil, prev: knot, parent: parent}
+	return knot.next
+}
+
+// AddToNextWithAttr data
+func (n *node) AddToNextWithAttr(knot *node, parent *node, key string, value any, attr map[string]string) *node {
+	if knot == nil {
+		knot = &node{key: key, value: value, attr: attr, next: nil, prev: nil, parent: nil}
+		return knot
+	}
+	knot.next = &node{key: key, value: value, attr: attr, next: nil, prev: knot, parent: parent}
 	return knot.next
 }
 
@@ -87,11 +98,13 @@ func (n *node) Print(knot *node) {
 }
 
 func (n *node) print(iter *node) {
-	fmt.Printf("%v %v, %v %v\n",
+	fmt.Printf("%v %v, %v %v, %v %v\n",
 		color.YellowString("Key: "),
 		iter.key,
 		color.YellowString("Value:"),
-		iter.value)
+		iter.value,
+		color.YellowString("Attr:"),
+		iter.attr)
 }
 
 // Exists node
