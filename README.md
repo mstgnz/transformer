@@ -3,7 +3,7 @@
 
 The main purpose of this project is to consolidate what I know, apply, learn new things, understand file systems and at the end of the day serve humanity :)
 
-This project aims to convert json, yaml and xml files to each other.
+This project aims to convert json, yaml and xml files into a golang object and then into each other.
 
 During the conversion process, the file format will be checked first. If the file is in an error-free format, an error-free conversion takes place.
 
