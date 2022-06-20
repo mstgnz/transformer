@@ -1,22 +1,21 @@
 ## Transformer
-#### Transformer for json, yaml and xml files
+### Transformer for json, yaml and xml files
 
-The main purpose of this project is to consolidate what I know, apply, learn new things, understand file systems and at the end of the day serve humanity :)
+The main purpose of this project is to convert json, yaml and xml files into a golang object.
 
-This project aims to convert json, yaml and xml files into a golang object and then into each other.
+As you know, there are two ways to convert json, yaml and xml files into an object.
 
-During the conversion process, the file format will be checked first. If the file is in an error-free format, an error-free conversion takes place.
+The first way is to create a struct suitable for the file contents and put it in order.
+But here we need to write the struct structure. For a large file this will be cumbersome.
 
-Users will be able to do this conversion process in two ways with command line or api.
+The second way is to convert it to a map object. Unfortunately, this map object is unordered. Therefore, it does not provide the structure we want.
 
-I have assigned the adopted path for conversion between files as follows. Rather than converting the given file directly, converting it to an object and giving it a chance to make certain changes to that object and then produce the output in the desired format.
+The third way is to write our own key-value structure and design it to be sequential.
 
-This way the project will not resist development.
+This transformer gives us the 3rd path.
 
-The map that comes embedded in the Go programming language is unfortunately unordered. so I'm looking for a way to decode sequentially.
+### What will this process bring us?
 
-- Check File Format - DONE
-- Decode File - DONE (but the map is unordered so UNDONE) - do refactor
-- Create recursive function and write to node - DONE
-- Create and print the desired file - UNDONE  
-- .......
+Our structure will hold the next, previous and parent objects along with the key/value. In this way, we will have the opportunity to move on the struct. We can also customize this struct as we want by adding the methods we want. By default, it will have search, remove, move and replace methods.
+
+File conversion will be made easier using this package.
