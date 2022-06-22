@@ -20,11 +20,11 @@ func xmlDecode(doc []byte) (*node, error) {
 	)
 	dec := xml.NewDecoder(strings.NewReader(string(doc)))
 	var (
-		key string
-		//objStart bool
-		arrCount int
-		objCount int
-		attr     map[string]string
+		key        string
+		arrCount   int
+		objStart   bool
+		firstChild bool
+		attr       map[string]string
 	)
 
 	for {
@@ -47,34 +47,42 @@ func xmlDecode(doc []byte) (*node, error) {
 					attr[kind.Attr[i].Name.Local] = kind.Attr[i].Value
 				}
 			}
-			objCount++
+			if objStart {
+				knot = knot.AddToNextWithAttr(knot, parent, key, &node{}, attr)
+			}
+			objStart = true
 		case xml.CharData:
-			if objCount <= 0 {
+			if !objStart {
 				continue
 			}
 			val := stripSpaces(string(kind))
-			if arrCount > 0 {
-				knot.SetToValue(knot, key, val)
-			} else {
-				if len(attr) > 0 {
-					knot = knot.AddToNextWithAttr(knot, parent, key, val, attr)
+			if len(val) > 0 {
+				if firstChild {
+					knot = knot.AddToValueWithAttr(knot, parent, key, val, attr)
 				} else {
-					knot = knot.AddToNext(knot, parent, key, val)
+					if arrCount > 0 {
+						knot.SetToValue(knot, key, val)
+					} else {
+						knot = knot.AddToNextWithAttr(knot, parent, key, val, attr)
+					}
 				}
+			} else {
+				knot = knot.AddToNextWithAttr(knot, parent, key, &node{prev: knot}, attr)
+				knot = convertToNode(knot.value)
+				firstChild = true
 			}
 			parent = knot
+			objStart = false
 		case xml.EndElement:
 			if arrCount > 0 {
 				arrCount--
-			}
-			if objCount > 0 {
-				objCount--
 			}
 			parent = nil
 			if knot.parent != nil {
 				knot = knot.parent
 				parent = knot
 			}
+			//fmt.Println("end", kind.Name.Local)
 		}
 	}
 }

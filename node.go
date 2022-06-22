@@ -16,7 +16,7 @@ type node struct {
 }
 
 // AddToNext data
-func (n *node) AddToNext(knot *node, parent *node, key string, value any) *node {
+func (*node) AddToNext(knot *node, parent *node, key string, value any) *node {
 	if knot == nil {
 		knot = &node{key: key, value: value, next: nil, prev: nil, parent: nil}
 		return knot
@@ -26,7 +26,7 @@ func (n *node) AddToNext(knot *node, parent *node, key string, value any) *node 
 }
 
 // AddToNextWithAttr data
-func (n *node) AddToNextWithAttr(knot *node, parent *node, key string, value any, attr map[string]string) *node {
+func (*node) AddToNextWithAttr(knot *node, parent *node, key string, value any, attr map[string]string) *node {
 	if knot == nil {
 		knot = &node{key: key, value: value, attr: attr, next: nil, prev: nil, parent: nil}
 		return knot
@@ -36,7 +36,7 @@ func (n *node) AddToNextWithAttr(knot *node, parent *node, key string, value any
 }
 
 // AddToValue data
-func (n *node) AddToValue(knot *node, parent *node, key string, value any) *node {
+func (*node) AddToValue(knot *node, parent *node, key string, value any) *node {
 	knot.value = &node{key: key, value: value, next: nil, prev: knot, parent: parent}
 	obj, ok := knot.value.(*node)
 	if ok {
@@ -45,15 +45,25 @@ func (n *node) AddToValue(knot *node, parent *node, key string, value any) *node
 	return knot
 }
 
+// AddToValueWithAttr data
+func (*node) AddToValueWithAttr(knot *node, parent *node, key string, value any, attr map[string]string) *node {
+	knot.value = &node{key: key, value: value, attr: attr, next: nil, prev: knot, parent: parent}
+	obj, ok := knot.value.(*node)
+	if ok {
+		return obj
+	}
+	return knot
+}
+
 // SetToValue data
-func (n *node) SetToValue(knot *node, key string, value any) *node {
+func (*node) SetToValue(knot *node, key string, value any) *node {
 	knot.key = key
 	knot.value = value
 	return knot
 }
 
 // AddToArr data
-func (n *node) AddToArr(knot *node, value any) *node {
+func (*node) AddToArr(knot *node, value any) *node {
 	arr, ok := knot.value.([]any)
 	if ok {
 		knot.value = append(arr, value)
@@ -62,13 +72,39 @@ func (n *node) AddToArr(knot *node, value any) *node {
 }
 
 // AddObjToArr data
-func (n *node) AddObjToArr(knot *node) *node {
+func (*node) AddObjToArr(knot *node) *node {
 	newObj := &node{prev: knot, parent: knot}
 	arr, ok := knot.value.([]any)
 	if ok {
 		knot.value = append(arr, newObj)
 	}
 	return newObj
+}
+
+// GetNode search data
+func (n *node) GetNode(key string) map[string]any {
+	iter := n
+	list := map[string]any{}
+	if iter == nil {
+		list[iter.key] = iter
+		return list
+	}
+	for iter.prev != nil {
+		iter = iter.prev
+	}
+	for iter != nil {
+		if iter.key == key {
+			list[key] = iter
+		}
+		// if node value is object
+		/*obj, ok := iter.value.(*node)
+		if ok {
+			fmt.Println("child for", iter.key)
+			n.GetNode(key)
+		}*/
+		iter = iter.next
+	}
+	return list
 }
 
 // Print data
@@ -87,17 +123,27 @@ func (n *node) Print(knot *node) {
 	for iter != nil {
 		n.print(iter)
 		// if node value is object
-		/*obj, ok := iter.value.(*node)
+		obj, ok := iter.value.(*node)
 		if ok {
 			fmt.Println("child for", iter.key)
 			n.Print(obj)
-		}*/
-		// TODO if the node value is slice and one of the slice value is an object
+			// if node value is array and if value in object
+			obj1, ok1 := obj.value.([]any)
+			if ok1 {
+				for _, v := range obj1 {
+					obj2, ok2 := v.(*node)
+					if ok2 {
+						fmt.Println("child for", obj.key)
+						n.Print(obj2)
+					}
+				}
+			}
+		}
 		iter = iter.next
 	}
 }
 
-func (n *node) print(iter *node) {
+func (*node) print(iter *node) {
 	fmt.Printf("%v %v, %v %v, %v %v\n",
 		color.YellowString("Key: "),
 		iter.key,
