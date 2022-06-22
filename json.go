@@ -22,12 +22,11 @@ func jsonDecode(doc []byte) (*node, error) {
 	)
 	dec := json.NewDecoder(strings.NewReader(string(doc)))
 	var (
-		key         string
-		types       string
-		typeVal     string
-		objStart    bool
-		arrStart    bool
-		arrObjStart bool
+		key      string
+		types    string
+		typeVal  string
+		objStart bool
+		arrCount int
 	)
 	for {
 		t, err := dec.Token()
@@ -39,7 +38,7 @@ func jsonDecode(doc []byte) (*node, error) {
 		typeVal = fmt.Sprintf("%v", t)
 		// If the type of the object is json.Delim
 		if types == "json.Delim" {
-			// Ff no node has been created yet, don't enter here, skip json start -> {
+			// If no node has been created yet, don't enter here, skip json start -> {
 			if !knot.Exists() {
 				continue
 			}
@@ -57,10 +56,6 @@ func jsonDecode(doc []byte) (*node, error) {
 				} else {
 					// bu aslında olmazsa olmazdır çünkü bir obje sadece ve sadece array içersinde keysiz başlar.
 					knot = knot.AddObjToArr(knot)
-				}
-				if arrStart {
-					arrObjStart = true
-					arrStart = false
 				}
 				objStart = true
 				key = ""
@@ -87,13 +82,10 @@ func jsonDecode(doc []byte) (*node, error) {
 					//knot = knot.AddToArr(knot, typeVal)
 				}
 				objStart = false
-				arrStart = true
+				arrCount++
 			case "]": // set close array
-				arrStart = false
+				arrCount--
 			case "}": // set close object and set parent node
-				if arrObjStart {
-					arrStart = true
-				}
 				parent = nil
 				if knot.parent != nil {
 					knot = knot.parent
@@ -108,7 +100,7 @@ func jsonDecode(doc []byte) (*node, error) {
 			if len(key) == 0 {
 				// eğer bir array objesi açık ise bu key değeri esasen array nesnesidir.
 				// if the array is not empty
-				if arrStart && !objStart {
+				if arrCount > 0 && !objStart {
 					knot = knot.AddToArr(knot, typeVal)
 				} else {
 					key = typeVal
@@ -127,5 +119,3 @@ func jsonDecode(doc []byte) (*node, error) {
 		}
 	}
 }
-
-// array içinde obje ve array işi karıştırıyor buna bi çözüm düşüneceğiz.
