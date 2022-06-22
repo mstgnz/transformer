@@ -19,17 +19,16 @@ func main() {
 	}
 
 	// jsonDecode
-	//knot, err := jsonDecode(doc)
+	knot, err := jsonDecode(doc)
 
 	// yamlDecode
 	//knot, err := yamlDecode(doc)
 
 	// xmlDecode
-	knot, err := xmlDecode(doc)
+	//knot, err := xmlDecode(doc)
 	if err != nil {
 		log.Println(err.Error())
 	}
 	knot.Print(nil)
-	//fmt.Println(convertToNode(convertToSlice(convertToNode(knot.value).next.value)[6]).prev)
 
 }

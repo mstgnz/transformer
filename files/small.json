@@ -9,13 +9,13 @@
   },
   "development": {
     "arr": [
-      234,"434",
+      "start",
       {
-        "sd": 34
+        "obj": "obj value",
+        "test": 34
       },
-      {
-        "435": 43
-      }
-    ]
+      "finish"
+    ],
+    "last": "element"
   }
 }
