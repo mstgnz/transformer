@@ -98,7 +98,14 @@ func jsonDecode(doc []byte) (*node, error) {
 				objStart = false
 				if arrCount > 0 {
 					arrStart = true
-					knot = knot.parent.parent
+					if knot.parent.parent != nil {
+						_, ok := knot.parent.parent.value.([]any)
+						if ok {
+							knot = knot.parent.parent
+						} else {
+							knot = knot.parent
+						}
+					}
 				} else {
 					parent = nil
 					if knot.parent != nil {
