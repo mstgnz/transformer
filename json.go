@@ -46,58 +46,59 @@ func jsonDecode(doc []byte) (*node, error) {
 			switch value {
 			case "{": // set open object - {
 				/*
-					burada iki tür opsiyon var.
-					1- key boş değilse; bu bir objedir. mevcut düğümün nextine yeni bir düğüm eklenecek ve geriye yeni eklenen düğüm dönecektir.
-					2- key boş ise; bir array objesi kesin vardır ve array içerisinde düğüm oluşturulacak ve geriye yeni eklenen düğüm dönecektir.
+					There are two types of options here.
+					1- If the key is not empty; this is an object. A new node will be added next to the existing node and the newly added node will return.
+					2- If the key is empty; There is an array object, and the node will be created in the array and the newly added node will be returned.
 				*/
 				if arrStart {
 					// bu aslında olmazsa olmazdır çünkü bir obje sadece ve sadece array içersinde keysiz başlar.
 					knot = knot.AddObjToArr(knot)
-					arrStart = true
 				} else {
 					knot = knot.AddToNext(knot, parent, key, &node{})
-					parent = knot
 				}
+				parent = knot
 				objStart = true
 				arrStart = false
 				objCount++
 				key = ""
 			case "[": // set open array - [
 				/*
-					burada iki tür opsiyon var
-					1- key boş değilse ve objStart true ise; nodun ilk değeri set edilecektir.
-					2- key boş değilse ve objStart false ise; nodun nextine yeni bir node oluşturulacaktır.
-					3- key boş ise; bu bir nested array nesnesidir. direk olarak mevcut düğümün arrayine eklenecektir.
+					there are three types of options here
+					1- If key is not null and objStart is true; The initial value of the node will be set.
+					2- If key is not empty and objStart is false; A new node will be created next to the node.
+					3- If the key is empty; this is a nested array object. will be added directly to the current node's array.
 				*/
 				if len(key) > 0 {
-					// eğer objStart true ise nodun ilk değeri set ediliyor.
+					// If objStart is true then the initial value of the node is set.
 					if objStart {
 						knot = knot.AddToValue(knot, parent, key, []any{})
 					} else {
-						// eğer objStart false ise mevcut nodun nextine yeni bir node oluşturuluyor.
+						// If objStart is false, a new node is created next to the current node.
 						knot = knot.AddToNext(knot, parent, key, []any{})
 					}
 					parent = knot
-					key = ""
 				} else {
-					// eğer key yok ise iç içe arraydir.
+					// If there is no key, it is a nested array.
 					// TODO nested array için indis tutulacak ve array kapatılana kadar bu arraye append edilecektir.
 					//knot = knot.AddToArr(knot, value)
 				}
 				arrStart = true
 				objStart = false
 				arrCount++
+				key = ""
 			case "]": // set close array
-				/*if objCount > 0 {
-					knot = knot.prev
-				}*/
 				arrCount--
 				arrStart = false
+				if knot.parent != nil {
+					knot = knot.parent
+					parent = knot.parent
+				}
 			case "}": // set close object and set parent node
+				objCount--
+				objStart = false
 				if arrCount > 0 {
 					arrStart = true
 				}
-				objCount--
 				parent = nil
 				if knot.parent != nil {
 					knot = knot.parent
@@ -107,24 +108,24 @@ func jsonDecode(doc []byte) (*node, error) {
 				fmt.Println("default not set -> ", t)
 			}
 		} else {
-			// döngü nesnesi bir json.Delim değil ise key ve value alanları set edilecektir.
-			// json nesnesi bir key value değer çifti olduğu için önce key set edilecek daha sonra value set edilecektir.
+			// If the loop object is not a json.Delim, the key and value fields will be set.
+			// Since the json object is a key value value pair, first the key will be set and then the value will be set.
 			if len(key) == 0 {
-				// eğer bir array objesi açık ise bu key değeri esasen array nesnesidir.
-				// if the array is not empty
+				// If an array object is open, this key value is essentially an array object.
+				// If the array is not empty
 				if arrStart {
 					knot = knot.AddToArr(knot, value)
 				} else {
 					key = value
 				}
 			} else {
-				// eğer objStart true ise nodun ilk değeri set ediliyor.
+				// If objStart is true then the initial value of the node is set.
 				if objStart {
 					knot = knot.AddToValue(knot, parent, key, value)
 				} else {
 					knot = knot.AddToNext(knot, parent, key, value)
 				}
-				// burada objStart ve key değerleri sıfırlanıyor.
+				// Here objStart and key values are reset.
 				objStart = false
 				key = ""
 			}
