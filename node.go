@@ -148,13 +148,15 @@ func (n *node) Print(knot *node) {
 }
 
 func (*node) print(iter *node) {
-	fmt.Printf("%v %v, %v %v, %v %v\n",
+	fmt.Printf("%v %v %v %v %v %v %v %v\n",
 		color.YellowString("Key: "),
 		iter.key,
 		color.YellowString("Value:"),
 		iter.value,
 		color.YellowString("Attr:"),
-		iter.attr)
+		iter.attr,
+		color.YellowString("Parent:"),
+		iter.parent)
 }
 
 // Exists node
