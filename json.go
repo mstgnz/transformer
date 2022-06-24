@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"reflect"
 	"strings"
 
@@ -90,7 +91,6 @@ func jsonDecode(doc []byte) (*node, error) {
 				arrCount--
 				arrStart = false
 				if knot.parent != nil {
-					knot = knot.parent
 					parent = knot.parent
 				}
 			case "}": // set close object and set parent node
@@ -98,14 +98,16 @@ func jsonDecode(doc []byte) (*node, error) {
 				objStart = false
 				if arrCount > 0 {
 					arrStart = true
-				}
-				parent = nil
-				if knot.parent != nil {
-					knot = knot.parent
-					parent = knot.parent
+					knot = knot.parent.parent
+				} else {
+					parent = nil
+					if knot.parent != nil {
+						knot = knot.parent
+						parent = knot.parent
+					}
 				}
 			default: // shouldn't go here
-				fmt.Println("default not set -> ", t)
+				log.Println("default not set -> ", t)
 			}
 		} else {
 			// If the loop object is not a json.Delim, the key and value fields will be set.
