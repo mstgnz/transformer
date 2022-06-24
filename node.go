@@ -121,6 +121,9 @@ func (n *node) Print(knot *node) {
 		iter = knot
 	}
 	for iter != nil {
+		if iter.parent == nil {
+			fmt.Println(color.BlueString("main"))
+		}
 		n.print(iter)
 		// if node value is object
 		obj, ok := iter.value.(*node)
