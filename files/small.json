@@ -12,7 +12,7 @@
       "start",
       {
         "obj": "obj value",
-        "args": [23.4,56],
+          
         "test": 34
       },
       "finish"

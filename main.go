@@ -31,4 +31,6 @@ func main() {
 	}
 	knot.Print(nil)
 
+	//fmt.Println(convertToNode(knot.GetNode("apiVersion")["apiVersion"]).next)
+
 }
