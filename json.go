@@ -27,7 +27,6 @@ func jsonDecode(doc []byte) (*node, error) {
 		value    string
 		objStart bool
 		arrStart bool
-		objCount int
 		arrCount int
 	)
 	for {
@@ -47,12 +46,11 @@ func jsonDecode(doc []byte) (*node, error) {
 			switch value {
 			case "{": // set open object - {
 				/*
-					There are two types of options here.
 					1- If the key is not empty; this is an object. A new node will be added next to the existing node and the newly added node will return.
 					2- If the key is empty; There is an array object, and the node will be created in the array and the newly added node will be returned.
 				*/
-				if arrStart {
-					// bu aslında olmazsa olmazdır çünkü bir obje sadece ve sadece array içersinde keysiz başlar.
+				if arrStart && len(key) == 0 {
+					// An object only starts without a key in an array.
 					knot = knot.AddObjToArr(knot)
 				} else {
 					knot = knot.AddToNext(knot, parent, key, &node{})
@@ -60,11 +58,9 @@ func jsonDecode(doc []byte) (*node, error) {
 				parent = knot
 				objStart = true
 				arrStart = false
-				objCount++
 				key = ""
 			case "[": // set open array - [
 				/*
-					there are three types of options here
 					1- If key is not null and objStart is true; The initial value of the node will be set.
 					2- If key is not empty and objStart is false; A new node will be created next to the node.
 					3- If the key is empty; this is a nested array object. will be added directly to the current node's array.
@@ -78,37 +74,24 @@ func jsonDecode(doc []byte) (*node, error) {
 						knot = knot.AddToNext(knot, parent, key, []any{})
 					}
 					parent = knot
+					arrStart = true
+					objStart = false
+					arrCount++
+					key = ""
 				} else {
 					// If there is no key, it is a nested array.
-					// TODO nested array için indis tutulacak ve array kapatılana kadar bu arraye append edilecektir.
 					//knot = knot.AddToArr(knot, value)
 				}
-				arrStart = true
-				objStart = false
-				arrCount++
-				key = ""
 			case "]": // set close array
 				arrCount--
 				arrStart = false
-				if knot.parent != nil {
-					parent = knot.parent
-				}
 			case "}": // set close object and set parent node
-				objCount--
-				objStart = false
-				if arrCount > 0 {
-					arrStart = true
-					if knot.parent.parent != nil {
-						_, ok := knot.parent.parent.value.([]any)
-						if ok {
-							knot = knot.parent.parent
-						} else {
-							knot = knot.parent
-						}
-					}
-				} else {
-					parent = nil
-					if knot.parent != nil {
+				parent = nil
+				if knot.parent != nil {
+					knot = knot.parent
+					parent = knot.parent
+					if arrCount > 0 && len(knot.key) == 0 {
+						arrStart = true
 						knot = knot.parent
 						parent = knot.parent
 					}

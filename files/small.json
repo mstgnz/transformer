@@ -11,9 +11,12 @@
     "arr": [
       "start",
       {
-        "obj": "obj value",
-        "args": [23.4,56],
-        "test": 34
+        "test": 455,
+        "developer": {
+          "backend": 122,
+          "frontend": 444
+        },
+        "mesut": 1
       },
       "finish"
     ],
