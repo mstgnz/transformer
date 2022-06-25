@@ -9,9 +9,9 @@ func main() {
 
 	bytes, err := JsonRead("files/small.json")
 	if err != nil {
-		log.Fatalln(err.Error())
+		log.Fatalln(err)
 	}
-	knot, err := JsonDecode(bytes)
+	knot, _ := JsonDecode(bytes)
 	knot.Print(nil)
 
 	fmt.Println(ConvertToNode(ConvertToNode(ConvertToSlice(ConvertToNode(knot.value).value)[1]).value).next.next)
