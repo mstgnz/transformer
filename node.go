@@ -146,15 +146,15 @@ func (n *node) Print(knot *node) {
 			}
 			fmt.Println(color.BlueString(fmt.Sprintf("child for %v", name)))
 			n.Print(obj)
-			// if node value is array and if value in object
-			arr, ok1 := obj.value.([]any)
-			if ok1 {
-				for _, v := range arr {
-					obj2, ok2 := v.(*node)
-					if ok2 {
-						fmt.Println(color.BlueString(fmt.Sprintf("child for %v %s", obj.key, "in object")))
-						n.Print(obj2)
-					}
+		}
+		// if node value is array and if value in object
+		arr, ok1 := iter.value.([]any)
+		if ok1 {
+			for _, v := range arr {
+				obj2, ok2 := v.(*node)
+				if ok2 {
+					fmt.Println(color.BlueString(fmt.Sprintf("child for %v %s", iter.key, "in object")))
+					n.Print(obj2)
 				}
 			}
 		}
