@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -31,7 +32,9 @@ func main() {
 	}
 	knot.Print(nil)
 
-	//test := convertToNode(knot.GetNode("development")["development"])
+	fmt.Println(convertToNode(convertToNode(convertToSlice(convertToNode(knot.value).value)[1]).value).next.next)
+
+	//test := convertToNode(knot.GetNode(nil, "development")["development"])
 
 	//fmt.Println(test.next)
 

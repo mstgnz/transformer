@@ -82,26 +82,38 @@ func (*node) AddObjToArr(knot *node) *node {
 }
 
 // GetNode search data
-func (n *node) GetNode(key string) map[string]any {
+func (n *node) GetNode(knot *node, key string) map[string]any {
 	iter := n
-	list := map[string]any{}
-	if iter == nil {
-		list[iter.key] = iter
+	list := make(map[string]any)
+	if iter == nil && knot == nil {
 		return list
 	}
-	for iter.prev != nil {
-		iter = iter.prev
+	if knot == nil {
+		for iter.prev != nil {
+			iter = iter.prev
+		}
+	} else {
+		iter = knot
 	}
 	for iter != nil {
 		if iter.key == key {
 			list[key] = iter
 		}
 		// if node value is object
-		/*obj, ok := iter.value.(*node)
+		obj, ok := iter.value.(*node)
 		if ok {
-			fmt.Println("child for", iter.key)
-			n.GetNode(key)
-		}*/
+			n.GetNode(obj, key)
+		}
+		// if node value is array and if value in object
+		obj1, ok1 := iter.value.([]any)
+		if ok1 {
+			for _, v := range obj1 {
+				obj2, ok2 := v.(*node)
+				if ok2 {
+					n.GetNode(obj2, key)
+				}
+			}
+		}
 		iter = iter.next
 	}
 	return list
@@ -135,9 +147,9 @@ func (n *node) Print(knot *node) {
 			fmt.Println(color.BlueString(fmt.Sprintf("child for %v", name)))
 			n.Print(obj)
 			// if node value is array and if value in object
-			obj1, ok1 := obj.value.([]any)
+			arr, ok1 := obj.value.([]any)
 			if ok1 {
-				for _, v := range obj1 {
+				for _, v := range arr {
 					obj2, ok2 := v.(*node)
 					if ok2 {
 						fmt.Println(color.BlueString(fmt.Sprintf("child for %v %s", obj.key, "in object")))
