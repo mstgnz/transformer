@@ -6,15 +6,15 @@ import (
 	"unicode"
 )
 
-// errorHandle
-func errorHandle(err error) {
+// ErrorHandle wrap error
+func ErrorHandle(err error) {
 	if err != nil {
 		log.Printf(err.Error())
 	}
 }
 
-// contains generic func for array contains any type
-func contains[T comparable](s []T, e T) bool {
+// Contains generic func for array contains any type
+func Contains[T comparable](s []T, e T) bool {
 	for _, v := range s {
 		if v == e {
 			return true
@@ -23,20 +23,20 @@ func contains[T comparable](s []T, e T) bool {
 	return false
 }
 
-// convertToNode convert to node
-func convertToNode(value any) *node {
-	knot, _ := value.(*node)
+// ConvertToNode convert to Node
+func ConvertToNode(value any) *Node {
+	knot, _ := value.(*Node)
 	return knot
 }
 
-// convertToSlice convert to any slice
-func convertToSlice(value any) []any {
+// ConvertToSlice convert to any slice
+func ConvertToSlice(value any) []any {
 	slc, _ := value.([]any)
 	return slc
 }
 
-// stripSpaces
-func stripSpaces(str string) string {
+// StripSpaces remove all spaces
+func StripSpaces(str string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.IsSpace(r) {
 			// if the character is a space, drop it
