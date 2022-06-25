@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"reflect"
 	"strings"
@@ -11,17 +12,30 @@ import (
 	"github.com/pkg/errors"
 )
 
-func isJSON(doc []byte) bool {
-	return json.Unmarshal(doc, new(map[string]any)) == nil
+// IsJSON Checks if the given file is in json format.
+func IsJSON(bytes []byte) bool {
+	return json.Unmarshal(bytes, new(map[string]any)) == nil
 }
 
-// jsonDecode
-func jsonDecode(doc []byte) (*node, error) {
+// JsonRead Reads the given file, returns as bytes
+func JsonRead(filename string) ([]byte, error) {
+	bytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return bytes, errors.Wrap(err, "cannot read the file")
+	}
+	if isJ := IsJSON(bytes); !isJ {
+		return bytes, errors.Wrap(err, "this file is not json")
+	}
+	return bytes, nil
+}
+
+// JsonDecode Converts a byte array to a key value struct.
+func JsonDecode(bytes []byte) (*Node, error) {
 	var (
-		knot   *node
-		parent *node
+		knot   *Node
+		parent *Node
 	)
-	dec := json.NewDecoder(strings.NewReader(string(doc)))
+	dec := json.NewDecoder(strings.NewReader(string(bytes)))
 	var (
 		key      string
 		value    string
@@ -38,7 +52,7 @@ func jsonDecode(doc []byte) (*node, error) {
 		value = fmt.Sprintf("%v", t)
 		// If the type of the object is json.Delim
 		if reflect.TypeOf(t).String() == "json.Delim" {
-			// If no node has been created yet, don't enter here, skip json start -> {
+			// If no Node has been created yet, don't enter here, skip json start -> {
 			if !knot.Exists() {
 				continue
 			}
@@ -46,14 +60,14 @@ func jsonDecode(doc []byte) (*node, error) {
 			switch value {
 			case "{": // set open object - {
 				/*
-					1- If the key is not empty; this is an object. A new node will be added next to the existing node and the newly added node will return.
-					2- If the key is empty; There is an array object, and the node will be created in the array and the newly added node will be returned.
+					1- If the key is not empty; this is an object. A new Node will be added next to the existing Node and the newly added Node will return.
+					2- If the key is empty; There is an array object, and the Node will be created in the array and the newly added Node will be returned.
 				*/
 				if arrStart && len(key) == 0 {
 					// An object only starts without a key in an array.
 					knot = knot.AddObjToArr(knot)
 				} else {
-					knot = knot.AddToNext(knot, parent, key, &node{})
+					knot = knot.AddToNext(knot, parent, key, &Node{})
 				}
 				parent = knot
 				objStart = true
@@ -61,16 +75,16 @@ func jsonDecode(doc []byte) (*node, error) {
 				key = ""
 			case "[": // set open array - [
 				/*
-					1- If key is not null and objStart is true; The initial value of the node will be set.
-					2- If key is not empty and objStart is false; A new node will be created next to the node.
-					3- If the key is empty; this is a nested array object. will be added directly to the current node's array.
+					1- If key is not null and objStart is true; The initial value of the Node will be set.
+					2- If key is not empty and objStart is false; A new Node will be created next to the Node.
+					3- If the key is empty; this is a nested array object. will be added directly to the current Node's array.
 				*/
 				if len(key) > 0 {
-					// If objStart is true then the initial value of the node is set.
+					// If objStart is true then the initial value of the Node is set.
 					if objStart {
 						knot = knot.AddToValue(knot, parent, key, []any{})
 					} else {
-						// If objStart is false, a new node is created next to the current node.
+						// If objStart is false, a new Node is created next to the current Node.
 						knot = knot.AddToNext(knot, parent, key, []any{})
 					}
 					parent = knot
@@ -85,7 +99,7 @@ func jsonDecode(doc []byte) (*node, error) {
 			case "]": // set close array
 				arrCount--
 				arrStart = false
-			case "}": // set close object and set parent node
+			case "}": // set close object and set parent Node
 				parent = nil
 				if knot.parent != nil {
 					knot = knot.parent
@@ -111,7 +125,7 @@ func jsonDecode(doc []byte) (*node, error) {
 					key = value
 				}
 			} else {
-				// If objStart is true then the initial value of the node is set.
+				// If objStart is true then the initial value of the Node is set.
 				if objStart {
 					knot = knot.AddToValue(knot, parent, key, value)
 				} else {

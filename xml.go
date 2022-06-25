@@ -3,22 +3,36 @@ package main
 import (
 	"encoding/xml"
 	"io"
+	"io/ioutil"
 	"strings"
 
 	"github.com/pkg/errors"
 )
 
-func isXml(doc []byte) bool {
-	return xml.Unmarshal(doc, new(interface{})) == nil
+// IsXml Checks if the given file is in xml format.
+func IsXml(bytes []byte) bool {
+	return xml.Unmarshal(bytes, new(interface{})) == nil
 }
 
-// xmlDecode
-func xmlDecode(doc []byte) (*node, error) {
+// XmlRead Reads the given file, returns as bytes
+func XmlRead(filename string) ([]byte, error) {
+	bytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return bytes, errors.Wrap(err, "cannot read the file")
+	}
+	if isX := IsXml(bytes); !isX {
+		return bytes, errors.Wrap(err, "this file is not xml")
+	}
+	return bytes, nil
+}
+
+// XmlDecode Converts a byte array to a key value struct.
+func XmlDecode(bytes []byte) (*Node, error) {
 	var (
-		knot   *node
-		parent *node
+		knot   *Node
+		parent *Node
 	)
-	dec := xml.NewDecoder(strings.NewReader(string(doc)))
+	dec := xml.NewDecoder(strings.NewReader(string(bytes)))
 	var (
 		key        string
 		arrCount   int
@@ -48,14 +62,14 @@ func xmlDecode(doc []byte) (*node, error) {
 				}
 			}
 			if objStart {
-				knot = knot.AddToNextWithAttr(knot, parent, key, &node{}, attr)
+				knot = knot.AddToNextWithAttr(knot, parent, key, &Node{}, attr)
 			}
 			objStart = true
 		case xml.CharData:
 			if !objStart {
 				continue
 			}
-			val := stripSpaces(string(kind))
+			val := StripSpaces(string(kind))
 			if len(val) > 0 {
 				if firstChild {
 					knot = knot.AddToValueWithAttr(knot, parent, key, val, attr)
@@ -67,8 +81,8 @@ func xmlDecode(doc []byte) (*node, error) {
 					}
 				}
 			} else {
-				knot = knot.AddToNextWithAttr(knot, parent, key, &node{prev: knot}, attr)
-				knot = convertToNode(knot.value)
+				knot = knot.AddToNextWithAttr(knot, parent, key, &Node{prev: knot}, attr)
+				knot = ConvertToNode(knot.value)
 				firstChild = true
 			}
 			parent = knot
