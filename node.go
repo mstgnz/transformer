@@ -205,7 +205,3 @@ func (*Node) print(iter *Node) {
 func (n *Node) Exists() bool {
 	return n != nil
 }
-
-func test(knot *Node) {
-
-}
