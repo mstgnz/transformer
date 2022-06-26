@@ -15,7 +15,14 @@ type Node struct {
 	Parent *Node
 }
 
-// AddToNext data
+// AddToNext
+// If the given node is zero, it overwrites and returns.
+// If knot is not nil, it adds a new node to the next one and returns the newly formed node.
+// Params
+// knot is the working node.
+// parent is the parent of the current node.
+// key is the key name
+// value supports multiple types. The ones we use are slice, node, string, float etc.
 func (*Node) AddToNext(knot *Node, parent *Node, key string, value any) *Node {
 	if knot == nil {
 		knot = &Node{Key: key, Value: value, Next: nil, Prev: nil, Parent: nil}
@@ -25,7 +32,10 @@ func (*Node) AddToNext(knot *Node, parent *Node, key string, value any) *Node {
 	return knot.Next
 }
 
-// AddToNextWithAttr data
+// AddToNextWithAttr
+// It is the method used for the attribute feature in xml format, since we are running things through a single node.
+// Since the order of the attribute does not matter, it will be kept as a map.
+// Parameters are the same as AddToNext.
 func (*Node) AddToNextWithAttr(knot *Node, parent *Node, key string, value any, attr map[string]string) *Node {
 	if knot == nil {
 		knot = &Node{Key: key, Value: value, Attr: attr, Next: nil, Prev: nil, Parent: nil}
@@ -35,7 +45,9 @@ func (*Node) AddToNextWithAttr(knot *Node, parent *Node, key string, value any, 
 	return knot.Next
 }
 
-// AddToValue data
+// AddToValue
+// It is the method used if the value of a node is a node.
+// Parameters are the same as AddToNext.
 func (*Node) AddToValue(knot *Node, parent *Node, key string, value any) *Node {
 	knot.Value = &Node{Key: key, Value: value, Next: nil, Prev: knot, Parent: parent}
 	obj, ok := knot.Value.(*Node)
@@ -45,7 +57,9 @@ func (*Node) AddToValue(knot *Node, parent *Node, key string, value any) *Node {
 	return knot
 }
 
-// AddToValueWithAttr data
+// AddToValueWithAttr
+// It is the method used if the value of a node is a node.
+// Same as AddToNextWithAttr
 func (*Node) AddToValueWithAttr(knot *Node, parent *Node, key string, value any, attr map[string]string) *Node {
 	knot.Value = &Node{Key: key, Value: value, Attr: attr, Next: nil, Prev: knot, Parent: parent}
 	obj, ok := knot.Value.(*Node)
@@ -55,14 +69,17 @@ func (*Node) AddToValueWithAttr(knot *Node, parent *Node, key string, value any,
 	return knot
 }
 
-// SetToValue data
+// SetToValue
+// It only allows the key and value to be set.
 func (*Node) SetToValue(knot *Node, key string, value any) *Node {
 	knot.Key = key
 	knot.Value = value
 	return knot
 }
 
-// AddToArr data
+// AddToArr
+// If the value of the node is a slice, it appends value.
+// Value supports multiple types. The ones we use are slice, node, string, float etc.
 func (*Node) AddToArr(knot *Node, value any) *Node {
 	arr, ok := knot.Value.([]any)
 	if ok {
@@ -71,7 +88,8 @@ func (*Node) AddToArr(knot *Node, value any) *Node {
 	return knot
 }
 
-// AddObjToArr data
+// AddObjToArr
+// If the value of the node is a slice, it appends *Node.
 func (*Node) AddObjToArr(knot *Node) *Node {
 	newObj := &Node{Prev: knot, Parent: knot}
 	arr, ok := knot.Value.([]any)
@@ -81,7 +99,7 @@ func (*Node) AddObjToArr(knot *Node) *Node {
 	return newObj
 }
 
-// GetNode search data
+// GetNode search Node
 func (n *Node) GetNode(knot *Node, key string) map[string]any {
 	iter := n
 	list := make(map[string]any)
@@ -119,7 +137,7 @@ func (n *Node) GetNode(knot *Node, key string) map[string]any {
 	return list
 }
 
-// Print data
+// Print Node
 func (n *Node) Print(knot *Node) {
 	iter := n
 	if iter == nil && knot == nil {
