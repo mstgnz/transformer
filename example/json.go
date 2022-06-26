@@ -8,7 +8,7 @@ import (
 
 func main() {
 
-	byt, err := transformer.JsonRead("example/files/valid.json")
+	byt, err := transformer.JsonRead("example/files/small.json")
 	if err != nil {
 		log.Fatalln(err)
 	}
