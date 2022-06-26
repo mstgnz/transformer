@@ -1,4 +1,4 @@
-package main
+package transformer
 
 import (
 	"encoding/json"
@@ -101,13 +101,13 @@ func JsonDecode(bytes []byte) (*Node, error) {
 				arrStart = false
 			case "}": // set close object and set parent Node
 				parent = nil
-				if knot.parent != nil {
-					knot = knot.parent
-					parent = knot.parent
-					if arrCount > 0 && len(knot.key) == 0 {
+				if knot.Parent != nil {
+					knot = knot.Parent
+					parent = knot.Parent
+					if arrCount > 0 && len(knot.Key) == 0 {
 						arrStart = true
-						knot = knot.parent
-						parent = knot.parent
+						knot = knot.Parent
+						parent = knot.Parent
 					}
 				}
 			default: // shouldn't go here
@@ -115,7 +115,7 @@ func JsonDecode(bytes []byte) (*Node, error) {
 			}
 		} else {
 			// If the loop object is not a json.Delim, the key and value fields will be set.
-			// Since the json object is a key value value pair, first the key will be set and then the value will be set.
+			// Since the json object is a key value pair, first the key will be set and then the value will be set.
 			if len(key) == 0 {
 				// If an array object is open, this key value is essentially an array object.
 				// If the array is not empty

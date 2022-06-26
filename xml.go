@@ -1,4 +1,4 @@
-package main
+package transformer
 
 import (
 	"encoding/xml"
@@ -81,8 +81,8 @@ func XmlDecode(bytes []byte) (*Node, error) {
 					}
 				}
 			} else {
-				knot = knot.AddToNextWithAttr(knot, parent, key, &Node{prev: knot}, attr)
-				knot = ConvertToNode(knot.value)
+				knot = knot.AddToNextWithAttr(knot, parent, key, &Node{Prev: knot}, attr)
+				knot = ConvertToNode(knot.Value)
 				firstChild = true
 			}
 			parent = knot
@@ -92,8 +92,8 @@ func XmlDecode(bytes []byte) (*Node, error) {
 				arrCount--
 			}
 			parent = nil
-			if knot.parent != nil {
-				knot = knot.parent
+			if knot.Parent != nil {
+				knot = knot.Parent
 				parent = knot
 			}
 			//fmt.Println("end", kind.Name.Local)
