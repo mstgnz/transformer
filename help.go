@@ -1,9 +1,13 @@
 package transformer
 
 import (
+	"fmt"
 	"log"
+	"os"
 	"strings"
 	"unicode"
+
+	"github.com/fatih/color"
 )
 
 // ErrorHandle wrap error
@@ -45,4 +49,12 @@ func StripSpaces(str string) string {
 		// else keep it in the string
 		return r
 	}, str)
+}
+
+// PrintErr with format
+func PrintErr(format string, args ...any) {
+	_, err := fmt.Fprintf(os.Stderr, color.RedString("error: "+format+"\n"), args...)
+	if err != nil {
+		log.Println("error printing failed")
+	}
 }
