@@ -15,6 +15,9 @@ func main() {
 	// Yaml
 	//yamlDecode()
 
+	// Xml
+	//xmlDecode()
+
 }
 
 func jsonDecode() {
@@ -34,6 +37,18 @@ func yamlDecode() {
 		log.Fatalln(err)
 	}
 	knot, err := transformer.YamlDecode(byt)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	fmt.Println(knot)
+}
+
+func xmlDecode() {
+	byt, err := transformer.XmlRead("files/valid.xml")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	knot, err := transformer.XmlDecode(byt)
 	if err != nil {
 		log.Fatalln(err)
 	}
