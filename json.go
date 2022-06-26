@@ -13,29 +13,29 @@ import (
 )
 
 // IsJSON Checks if the given file is in json format.
-func IsJSON(bytes []byte) bool {
-	return json.Unmarshal(bytes, new(map[string]any)) == nil
+func IsJSON(byt []byte) bool {
+	return json.Unmarshal(byt, new(map[string]any)) == nil
 }
 
-// JsonRead Reads the given file, returns as bytes
+// JsonRead Reads the given file, returns as byt
 func JsonRead(filename string) ([]byte, error) {
-	bytes, err := ioutil.ReadFile(filename)
+	byt, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return bytes, errors.Wrap(err, "cannot read the file")
+		return byt, errors.Wrap(err, "cannot read the file")
 	}
-	if isJ := IsJSON(bytes); !isJ {
-		return bytes, errors.Wrap(errors.New("this file is not json"), "this file is not json")
+	if isJ := IsJSON(byt); !isJ {
+		return byt, errors.Wrap(errors.New("this file is not json"), "this file is not json")
 	}
-	return bytes, nil
+	return byt, nil
 }
 
 // JsonDecode Converts a byte array to a key value struct.
-func JsonDecode(bytes []byte) (*Node, error) {
+func JsonDecode(byt []byte) (*Node, error) {
 	var (
 		knot   *Node
 		parent *Node
 	)
-	dec := json.NewDecoder(strings.NewReader(string(bytes)))
+	dec := json.NewDecoder(strings.NewReader(string(byt)))
 	var (
 		key      string
 		value    string

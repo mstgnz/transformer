@@ -10,29 +10,29 @@ import (
 )
 
 // IsXml Checks if the given file is in xml format.
-func IsXml(bytes []byte) bool {
-	return xml.Unmarshal(bytes, new(interface{})) == nil
+func IsXml(byt []byte) bool {
+	return xml.Unmarshal(byt, new(interface{})) == nil
 }
 
-// XmlRead Reads the given file, returns as bytes
+// XmlRead Reads the given file, returns as byt
 func XmlRead(filename string) ([]byte, error) {
-	bytes, err := ioutil.ReadFile(filename)
+	byt, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return bytes, errors.Wrap(err, "cannot read the file")
+		return byt, errors.Wrap(err, "cannot read the file")
 	}
-	if isX := IsXml(bytes); !isX {
-		return bytes, errors.Wrap(errors.New("this file is not json"), "this file is not xml")
+	if isX := IsXml(byt); !isX {
+		return byt, errors.Wrap(errors.New("this file is not xml"), "this file is not xml")
 	}
-	return bytes, nil
+	return byt, nil
 }
 
 // XmlDecode Converts a byte array to a key value struct.
-func XmlDecode(bytes []byte) (*Node, error) {
+func XmlDecode(byt []byte) (*Node, error) {
 	var (
 		knot   *Node
 		parent *Node
 	)
-	dec := xml.NewDecoder(strings.NewReader(string(bytes)))
+	dec := xml.NewDecoder(strings.NewReader(string(byt)))
 	var (
 		key        string
 		arrCount   int
