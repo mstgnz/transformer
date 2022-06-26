@@ -6,6 +6,7 @@ import (
 	"github.com/fatih/color"
 )
 
+// Node We decode json, xml and yaml formats with a single node.
 type Node struct {
 	Key    string
 	Value  any
