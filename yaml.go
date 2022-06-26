@@ -2,46 +2,47 @@ package transformer
 
 import (
 	"io/ioutil"
-	"os"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 )
 
 // IsYaml Checks if the given file is in xml format.
-func isYaml(bytes []byte) bool {
-	return yaml.Unmarshal(bytes, new(map[string]any)) == nil
+func IsYaml(byt []byte) bool {
+	return yaml.Unmarshal(byt, &yaml.Node{}) == nil
 }
 
-// YamlRead Reads the given file, returns as bytes
+// YamlRead Reads the given file, returns as byt
 func YamlRead(filename string) ([]byte, error) {
-	bytes, err := ioutil.ReadFile(filename)
+	byt, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return bytes, errors.Wrap(err, "cannot read the file")
+		return byt, errors.Wrap(err, "cannot read the file")
 	}
-	if isY := IsXml(bytes); !isY {
-		return bytes, errors.Wrap(errors.New("this file is not json"), "this file is not yaml")
+	if isY := IsYaml(byt); !isY {
+		return byt, errors.Wrap(errors.New("this file is not yaml"), "this file is not yaml")
 	}
-	return bytes, nil
+	return byt, nil
 }
 
 // YamlDecode Converts a byte array to a key value struct.
-func YamlDecode(bytes []byte) (*Node, error) {
+func YamlDecode(byt []byte) (*Node, error) {
 	var (
 		knot *Node
+		yam  yaml.Node
 		//parent *Node
 	)
 
 	// Decode File
-	var test yaml.Node
-	err := yaml.Unmarshal(bytes, &test)
-	ErrorHandle(err)
+	err := yaml.Unmarshal(byt, &yam)
+	if err != nil {
+		return knot, err
+	}
 
-	// Encode
+	/*// Encode
 	enc := yaml.NewEncoder(os.Stdout)
 	enc.SetIndent(2)
-	err = enc.Encode(test.Content[0])
-	ErrorHandle(err)
+	err = enc.Encode(yam.Content[0])
+	ErrorHandle(err)*/
 
 	return knot, nil
 }
