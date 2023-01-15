@@ -3,7 +3,7 @@ package transformer
 import (
 	"encoding/xml"
 	"io"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -16,7 +16,7 @@ func IsXml(byt []byte) bool {
 
 // XmlRead Reads the given file, returns as byt
 func XmlRead(filename string) ([]byte, error) {
-	byt, err := ioutil.ReadFile(filename)
+	byt, err := os.ReadFile(filename)
 	if err != nil {
 		return byt, errors.Wrap(err, "cannot read the file")
 	}

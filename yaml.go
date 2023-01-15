@@ -1,7 +1,7 @@
 package transformer
 
 import (
-	"io/ioutil"
+	"os"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
@@ -14,7 +14,7 @@ func IsYaml(byt []byte) bool {
 
 // YamlRead Reads the given file, returns as byt
 func YamlRead(filename string) ([]byte, error) {
-	byt, err := ioutil.ReadFile(filename)
+	byt, err := os.ReadFile(filename)
 	if err != nil {
 		return byt, errors.Wrap(err, "cannot read the file")
 	}
