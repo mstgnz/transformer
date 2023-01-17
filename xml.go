@@ -96,7 +96,6 @@ func XmlDecode(byt []byte) (*Node, error) {
 				knot = knot.Parent
 				parent = knot
 			}
-			//fmt.Println("end", kind.Name.Local)
 		}
 	}
 }
