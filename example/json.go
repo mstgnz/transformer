@@ -6,9 +6,9 @@ import (
 	"gitgub.com/mstgnz/transformer"
 )
 
-func main() {
+func json() {
 
-	byt, err := transformer.JsonRead("example/files/small.json")
+	byt, err := transformer.JsonRead("example/files/valid.json")
 	if err != nil {
 		log.Fatalln(err)
 	}

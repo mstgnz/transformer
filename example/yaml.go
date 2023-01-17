@@ -7,7 +7,7 @@ import (
 	"gitgub.com/mstgnz/transformer"
 )
 
-func main() {
+func yaml() {
 
 	byt, err := transformer.YamlRead("example/files/valid.yaml")
 	if err != nil {

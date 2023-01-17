@@ -205,3 +205,11 @@ func (*Node) print(iter *Node) {
 func (n *Node) Exists() bool {
 	return n != nil
 }
+
+func (n *Node) Reset() *Node {
+	iter := n
+	for iter.Prev != nil {
+		iter = iter.Prev
+	}
+	return iter
+}
