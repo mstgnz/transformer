@@ -20,7 +20,3 @@ Our structure will hold the next, previous and parent objects along with the key
 File conversion will be made easier using this package.
 
 Now that our plan is like this, let's get started. I will start with json first, then xml and finally yaml.
-
-json v1 will be xml v2 and yaml v3. Then we will continue in the form of bugfixes and improvements.
-
-json v1 is under construction...
