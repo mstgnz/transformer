@@ -2,10 +2,10 @@ package main
 
 func main() {
 	// Json Node
-	//json()
+	json()
 
 	// Xml Node
-	xml()
+	//xml()
 
 	// Yaml Node
 	//yaml()

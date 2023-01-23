@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"gitgub.com/mstgnz/transformer"
@@ -14,5 +15,7 @@ func json() {
 	}
 	knot, _ := transformer.JsonDecode(byt)
 	knot.Print(nil)
+
+	fmt.Println(knot.GetNode(nil, "containerPort"))
 
 }
