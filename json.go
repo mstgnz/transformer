@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -137,4 +138,19 @@ func JsonDecode(byt []byte) (*Node, error) {
 			}
 		}
 	}
+}
+
+// NodeToJson TODO test
+func NodeToJson(node *Node) ([]byte, error) {
+	var (
+		buf bytes.Buffer
+		enc *json.Encoder
+	)
+	enc = json.NewEncoder(&buf)
+	enc.SetIndent("  ", "  ")
+	err := enc.Encode(node)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
