@@ -1,27 +1,29 @@
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: rss-site
-  labels:
-    app: web
+  name: front-end
 spec:
-  containers:
-    - name: front-end
-      image: nginx
-      ports:
-        - containerPort: 80
+  replicas: 1
+  selector:
+    matchLabels:
+      app: front-end
+  template:
+    metadata:
+      labels:
+        app: front-end
+    spec:
+      containers:
+        - name: front-end
+          image: "front-end:1.0.1"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "250m"
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          env:
+            - name: BROKER_URL
+              value: "http://broker-service.info"
           ports:
-            - 34
-            - 55
-          status:
-            - 'on'
-            - 'off'
-    - name: rss-reader
-      image: a/rss-php-nginx:v1
-      ports:
-        - containerPort: 0.23
-          test:
-            - - 23
-              - 334
-            - - old
-              - new
+            - containerPort: 8081
