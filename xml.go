@@ -99,3 +99,8 @@ func XmlDecode(byt []byte) (*Node, error) {
 		}
 	}
 }
+
+// NodeToXml TODO
+func NodeToXml(node *Node) ([]byte, error) {
+	return nil, nil
+}

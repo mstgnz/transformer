@@ -24,6 +24,7 @@ func YamlRead(filename string) ([]byte, error) {
 	return byt, nil
 }
 
+// YamlDecode TODO
 // YamlDecode Converts a byte array to a key value struct.
 func YamlDecode(byt []byte) (*Node, error) {
 	var (
@@ -45,4 +46,9 @@ func YamlDecode(byt []byte) (*Node, error) {
 	ErrorHandle(err)*/
 
 	return knot, nil
+}
+
+// NodeToYml TODO
+func NodeToYml(node *Node) ([]byte, error) {
+	return nil, nil
 }
