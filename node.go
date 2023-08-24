@@ -147,6 +147,34 @@ func (n *Node) GetNode(knot *Node, key string) []any {
 	return list
 }
 
+// GetNode alternative
+/*func (n *Node) GetNode(key string) *Node {
+	iter := n.Reset()
+	for iter != nil {
+		if iter.Key == key {
+			return iter
+		}
+		if node, ok := iter.Value.(*Node); ok {
+			res := node.GetNode(key)
+			if res != nil {
+				return res
+			}
+		}
+		if slice, ok := iter.Value.([]any); ok {
+			for _, v := range slice {
+				if node, ok := v.(*Node); ok {
+					res := node.GetNode(key)
+					if res != nil {
+						return res
+					}
+				}
+			}
+		}
+		iter = iter.Next
+	}
+	return nil
+}*/
+
 // Print Node
 func (n *Node) Print(knot *Node) {
 	iter := n
