@@ -20,7 +20,7 @@ func XmlRead(filename string) ([]byte, error) {
 	if err != nil {
 		return byt, errors.Wrap(err, "cannot read the file")
 	}
-	if isX := IsXml(byt); !isX {
+	if ok := IsXml(byt); !ok {
 		return byt, errors.Wrap(errors.New("this file is not xml"), "this file is not xml")
 	}
 	return byt, nil

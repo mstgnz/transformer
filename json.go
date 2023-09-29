@@ -24,7 +24,7 @@ func JsonRead(filename string) ([]byte, error) {
 	if err != nil {
 		return byt, errors.Wrap(err, "cannot read the file")
 	}
-	if isJ := IsJSON(byt); !isJ {
+	if ok := IsJSON(byt); !ok {
 		return byt, errors.Wrap(errors.New("this file is not json"), "this file is not json")
 	}
 	return byt, nil
