@@ -18,7 +18,7 @@ func YamlRead(filename string) ([]byte, error) {
 	if err != nil {
 		return byt, errors.Wrap(err, "cannot read the file")
 	}
-	if isY := IsYaml(byt); !isY {
+	if ok := IsYaml(byt); !ok {
 		return byt, errors.Wrap(errors.New("this file is not yaml"), "this file is not yaml")
 	}
 	return byt, nil

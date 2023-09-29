@@ -15,20 +15,20 @@
 			<image>nginx</image>
 			<ports>
 				<containerPort>80</containerPort>
-				<port>34</port>
+				<port port="34">34</port>
 				<port>55</port>
-				<status>on</status>
+				<status status="on">on</status>
 				<status>off</status>
 			</ports>
 		</containers>
 		<containers>
 			<name>rss-reader</name>
-			<image>a/rss-php-nginx:v1</image>
+			<image img="nginx">a/rss-php-nginx:v1</image>
 			<ports>
 				<containerPort>0.23</containerPort>
 				<test>23</test>
 				<test>334</test>
-				<test>old</test>
+				<test type="old">old</test>
 				<test>new</test>
 			</ports>
 		</containers>

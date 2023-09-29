@@ -24,6 +24,6 @@ spec:
               cpu: "500m"
           env:
             - name: BROKER_URL
-              value: "http://broker-service.info"
+              value: "https://broker-service.info"
           ports:
             - containerPort: 8081
