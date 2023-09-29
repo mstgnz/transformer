@@ -108,114 +108,74 @@ func (n *Node) AddObjToArr(knot *Node) *Node {
 	return newObj
 }
 
-var list []any
-
 // GetNode search Node
 func (n *Node) GetNode(knot *Node, key string) []any {
-	iter := n
-	if iter == nil && knot == nil {
-		return list
-	}
-	if knot == nil {
-		for iter.Prev != nil {
-			iter = iter.Prev
+	var list []any
+	var search func(node *Node)
+	search = func(node *Node) {
+		if node == nil {
+			return
 		}
-	} else {
-		iter = knot
-	}
-	for iter != nil {
-		if iter.Key == key {
-			list = append(list, iter)
-		}
-		// if Node value is object
-		obj, ok := iter.Value.(*Node)
-		if ok {
-			n.GetNode(obj, key)
-		}
-		// if Node value is array and if value in object
-		obj1, ok1 := iter.Value.([]any)
-		if ok1 {
-			for _, v := range obj1 {
-				obj2, ok2 := v.(*Node)
-				if ok2 {
-					n.GetNode(obj2, key)
-				}
+		for node != nil {
+			if node.Key == key {
+				list = append(list, node)
 			}
-		}
-		iter = iter.Next
-	}
-	return list
-}
-
-// GetNode alternative
-/*func (n *Node) GetNode(key string) *Node {
-	iter := n.Reset()
-	for iter != nil {
-		if iter.Key == key {
-			return iter
-		}
-		if node, ok := iter.Value.(*Node); ok {
-			res := node.GetNode(key)
-			if res != nil {
-				return res
+			// if Node value is object
+			if obj, ok := node.Value.(*Node); ok {
+				search(obj)
 			}
-		}
-		if slice, ok := iter.Value.([]any); ok {
-			for _, v := range slice {
-				if node, ok := v.(*Node); ok {
-					res := node.GetNode(key)
-					if res != nil {
-						return res
+			// if Node value is array and if value in object
+			if arr, ok := node.Value.([]any); ok {
+				for _, v := range arr {
+					if obj, ok := v.(*Node); ok {
+						search(obj)
 					}
 				}
 			}
+			node = node.Next
 		}
-		iter = iter.Next
 	}
-	return nil
-}*/
+	if knot == nil {
+		knot = n.Reset()
+	}
+	search(knot)
+	return list
+}
 
 // Print Node
 func (n *Node) Print(knot *Node) {
-	iter := n
-	if iter == nil && knot == nil {
-		return
-	}
-	if knot == nil {
-		for iter.Prev != nil {
-			iter = iter.Prev
-		}
-	} else {
-		iter = knot
-	}
-	for iter != nil {
-		if iter.Parent == nil {
-			fmt.Println(color.BlueString("main"))
-		}
-		n.print(iter)
-		// if Node value is object
-		obj, ok := iter.Value.(*Node)
-		if ok {
-			name := iter.Key
-			if len(name) == 0 {
-				name = "array object"
+	var write func(node *Node)
+	write = func(node *Node) {
+		for node != nil {
+			if node.Parent == nil {
+				fmt.Println(color.BlueString("main"))
 			}
-			fmt.Println(color.BlueString(fmt.Sprintf("child for %v", name)))
-			n.Print(obj)
-		}
-		// if Node value is array and if value in object
-		arr, ok1 := iter.Value.([]any)
-		if ok1 {
-			for _, v := range arr {
-				obj2, ok2 := v.(*Node)
-				if ok2 {
-					fmt.Println(color.BlueString(fmt.Sprintf("child for %v %s", iter.Key, "in object")))
-					n.Print(obj2)
+			write(node)
+			// if Node value is object
+			if obj, ok := node.Value.(*Node); ok {
+				name := node.Key
+				if len(name) == 0 {
+					name = "array object"
+				}
+				fmt.Println(color.BlueString(fmt.Sprintf("child for %v", name)))
+				write(obj)
+			}
+			// if Node value is array and if value in object
+			if arr, ok := node.Value.([]any); ok {
+				for _, v := range arr {
+					if obj, ok := v.(*Node); ok {
+						fmt.Println(color.BlueString(fmt.Sprintf("child for %v %s", node.Key, "in object")))
+						write(obj)
+					}
 				}
 			}
+			node = node.Next
 		}
-		iter = iter.Next
 	}
+	if knot == nil {
+		knot = n.Reset()
+	}
+	write(knot)
 }
 
 func (n *Node) print(iter *Node) {
