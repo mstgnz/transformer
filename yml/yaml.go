@@ -1,8 +1,9 @@
-package transformer
+package yml
 
 import (
 	"os"
 
+	"gitgub.com/mstgnz/transformer/node"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 )
@@ -12,8 +13,8 @@ func IsYaml(byt []byte) bool {
 	return yaml.Unmarshal(byt, &yaml.Node{}) == nil
 }
 
-// YamlRead Reads the given file, returns as byt
-func YamlRead(filename string) ([]byte, error) {
+// ReadYaml Reads the given file, returns as byt
+func ReadYaml(filename string) ([]byte, error) {
 	byt, err := os.ReadFile(filename)
 	if err != nil {
 		return byt, errors.Wrap(err, "cannot read the file")
@@ -24,11 +25,11 @@ func YamlRead(filename string) ([]byte, error) {
 	return byt, nil
 }
 
-// YamlDecode TODO
-// YamlDecode Converts a byte array to a key value struct.
-func YamlDecode(byt []byte) (*Node, error) {
+// DecodeYaml TODO
+// DecodeYaml Converts a byte array to a key value struct.
+func DecodeYaml(byt []byte) (*node.Node, error) {
 	var (
-		knot *Node
+		knot *node.Node
 		yam  yaml.Node
 		//parent *Node
 	)
@@ -49,6 +50,6 @@ func YamlDecode(byt []byte) (*Node, error) {
 }
 
 // NodeToYml TODO
-func NodeToYml(node *Node) ([]byte, error) {
+func NodeToYml(node *node.Node) ([]byte, error) {
 	return nil, nil
 }
