@@ -1,8 +1,10 @@
-package transformer
+package xml
 
 import (
 	"reflect"
 	"testing"
+
+	"gitgub.com/mstgnz/transformer/node"
 )
 
 func TestIsXml(t *testing.T) {
@@ -27,7 +29,7 @@ func TestIsXml(t *testing.T) {
 
 func TestNodeToXml(t *testing.T) {
 	type args struct {
-		node *Node
+		node *node.Node
 	}
 	tests := []struct {
 		name    string
@@ -58,20 +60,20 @@ func TestXmlDecode(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *Node
+		want    *node.Node
 		wantErr bool
 	}{
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := XmlDecode(tt.args.byt)
+			got, err := DecodeXml(tt.args.byt)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("XmlDecode() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("DecodeXml() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("XmlDecode() got = %v, want %v", got, tt.want)
+				t.Errorf("DecodeXml() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -91,13 +93,13 @@ func TestXmlRead(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := XmlRead(tt.args.filename)
+			got, err := ReadXml(tt.args.filename)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("XmlRead() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ReadXml() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("XmlRead() got = %v, want %v", got, tt.want)
+				t.Errorf("ReadXml() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
