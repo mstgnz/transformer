@@ -51,8 +51,7 @@ func (n *Node) AddToValue(knot *Node, parent *Node, key string, value any) *Node
 		return &Node{Key: key, Value: value, Prev: knot, Parent: parent}
 	}
 	knot.Value = &Node{Key: key, Value: value, Prev: knot, Parent: parent}
-	obj, ok := knot.Value.(*Node)
-	if ok {
+	if obj, ok := knot.Value.(*Node); ok {
 		return obj
 	}
 	return knot
@@ -86,8 +85,7 @@ func (n *Node) AddToArr(knot *Node, value any) *Node {
 		knot = &Node{Value: []any{value}}
 		return knot
 	}
-	arr, ok := knot.Value.([]any)
-	if ok {
+	if arr, ok := knot.Value.([]any); ok {
 		knot.Value = append(arr, value)
 	}
 	return knot
@@ -101,16 +99,15 @@ func (n *Node) AddObjToArr(knot *Node) *Node {
 		return knot
 	}
 	newObj := &Node{Prev: knot, Parent: knot}
-	arr, ok := knot.Value.([]any)
-	if ok {
+	if arr, ok := knot.Value.([]any); ok {
 		knot.Value = append(arr, newObj)
 	}
 	return newObj
 }
 
 // GetNode search Node
-func (n *Node) GetNode(knot *Node, key string) []any {
-	var list []any
+func (n *Node) GetNode(knot *Node, key string) []*Node {
+	var list []*Node
 	var search func(node *Node)
 	search = func(node *Node) {
 		if node == nil {
