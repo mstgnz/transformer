@@ -3,16 +3,16 @@ package main
 import (
 	"log"
 
-	"gitgub.com/mstgnz/transformer"
+	xml2 "gitgub.com/mstgnz/transformer/xml"
 )
 
 func xml() {
 
-	byt, err := transformer.XmlRead("example/files/valid.xml")
+	byt, err := xml2.ReadXml("example/files/valid.xml")
 	if err != nil {
 		log.Fatalln(err)
 	}
-	knot, _ := transformer.XmlDecode(byt)
+	knot, _ := xml2.DecodeXml(byt)
 	knot.Print(nil)
 
 }
