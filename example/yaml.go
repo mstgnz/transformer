@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"log"
 
-	"gitgub.com/mstgnz/transformer"
+	"gitgub.com/mstgnz/transformer/yml"
 )
 
 func yaml() {
 
-	byt, err := transformer.YamlRead("example/files/valid.yaml")
+	byt, err := yml.ReadYaml("example/files/valid.yaml")
 	if err != nil {
 		log.Fatalln(err)
 	}
-	knot, err := transformer.YamlDecode(byt)
+	knot, err := yml.DecodeYaml(byt)
 	if err != nil {
 		log.Fatalln(err)
 	}

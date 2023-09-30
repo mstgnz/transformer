@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"log"
 
-	"gitgub.com/mstgnz/transformer"
+	json2 "gitgub.com/mstgnz/transformer/json"
 )
 
 func json() {
 
-	byt, err := transformer.JsonRead("example/files/valid.json")
+	byt, err := json2.ReadJson("example/files/valid.json")
 	if err != nil {
 		log.Fatalln(err)
 	}
-	knot, _ := transformer.JsonDecode(byt)
+	knot, _ := json2.DecodeJson(byt)
 
 	fmt.Println(knot.GetNode(nil, "test")[0].Value)
 }
