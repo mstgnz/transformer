@@ -2,11 +2,11 @@ package main
 
 func main() {
 	// Json Node
-	json()
+	runJson()
 
 	// Xml Node
-	// xml()
+	// runXml()
 
 	// Yaml Node
-	//yaml()
+	// runYaml()
 }
