@@ -1,8 +1,10 @@
-package transformer
+package yml
 
 import (
 	"reflect"
 	"testing"
+
+	"gitgub.com/mstgnz/transformer/node"
 )
 
 func TestIsYaml(t *testing.T) {
@@ -27,7 +29,7 @@ func TestIsYaml(t *testing.T) {
 
 func TestNodeToYml(t *testing.T) {
 	type args struct {
-		node *Node
+		node *node.Node
 	}
 	tests := []struct {
 		name    string
@@ -58,20 +60,20 @@ func TestYamlDecode(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *Node
+		want    *node.Node
 		wantErr bool
 	}{
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := YamlDecode(tt.args.byt)
+			got, err := DecodeYaml(tt.args.byt)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("YamlDecode() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("DecodeYaml() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("YamlDecode() got = %v, want %v", got, tt.want)
+				t.Errorf("DecodeYaml() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -91,13 +93,13 @@ func TestYamlRead(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := YamlRead(tt.args.filename)
+			got, err := ReadYaml(tt.args.filename)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("YamlRead() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ReadYaml() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("YamlRead() got = %v, want %v", got, tt.want)
+				t.Errorf("ReadYaml() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
