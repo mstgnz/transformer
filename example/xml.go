@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	xml "gitgub.com/mstgnz/transformer/xml"
+	"gitgub.com/mstgnz/transformer/xml"
 )
 
 func runXml() {
