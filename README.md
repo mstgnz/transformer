@@ -15,7 +15,7 @@ This transformer gives us the 3rd path.
 
 ### What will this process bring us?
 
-Our structure will hold the next, previous and parent objects along with the key/value. In this way, we will have the opportunity to move on the struct. We can also customize this struct as we want by adding the methods we want. By default, it will have search, remove, move and replace methods.
+Our structure will hold the next, previous and parent objects along with the key/value. In this way, we will have the opportunity to move on the struct. We can also customize this struct as we want by adding the methods we want.
 
 File conversion will be made easier using this package.
 
