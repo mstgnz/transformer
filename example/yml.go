@@ -7,13 +7,13 @@ import (
 	"gitgub.com/mstgnz/transformer/yml"
 )
 
-func runYaml() {
+func runYml() {
 
-	byt, err := yml.ReadYaml("example/files/valid.yaml")
+	byt, err := yml.ReadYml("example/files/valid.yaml")
 	if err != nil {
 		log.Fatalln(err)
 	}
-	knot, err := yml.DecodeYaml(byt)
+	knot, err := yml.DecodeYml(byt)
 	if err != nil {
 		log.Fatalln(err)
 	}

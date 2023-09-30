@@ -8,26 +8,26 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// IsYaml Checks if the given file is in xml format.
-func IsYaml(byt []byte) bool {
+// IsYml Checks if the given file is in xml format.
+func IsYml(byt []byte) bool {
 	return yaml.Unmarshal(byt, &yaml.Node{}) == nil
 }
 
-// ReadYaml Reads the given file, returns as byt
-func ReadYaml(filename string) ([]byte, error) {
+// ReadYml Reads the given file, returns as byt
+func ReadYml(filename string) ([]byte, error) {
 	byt, err := os.ReadFile(filename)
 	if err != nil {
 		return byt, errors.Wrap(err, "cannot read the file")
 	}
-	if ok := IsYaml(byt); !ok {
+	if ok := IsYml(byt); !ok {
 		return byt, errors.Wrap(errors.New("this file is not yaml"), "this file is not yaml")
 	}
 	return byt, nil
 }
 
-// DecodeYaml TODO
-// DecodeYaml Converts a byte array to a key value struct.
-func DecodeYaml(byt []byte) (*node.Node, error) {
+// DecodeYml TODO
+// DecodeYml Converts a byte array to a key value struct.
+func DecodeYml(byt []byte) (*node.Node, error) {
 	var (
 		knot *node.Node
 		yam  yaml.Node
