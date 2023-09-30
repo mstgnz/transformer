@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"gitgub.com/mstgnz/transformer/xml"
@@ -13,6 +14,6 @@ func runXml() {
 		log.Fatalln(err)
 	}
 	knot, _ := xml.DecodeXml(byt)
-	knot.Print(nil)
+	fmt.Println(knot.GetNode(nil, "test")[0].Value)
 
 }
