@@ -19,8 +19,6 @@ Our structure will hold the next, previous and parent objects along with the key
 
 File conversion will be made easier using this package.
 
-Now that our plan is like this, let's get started. I will start with json first, then xml and finally yaml.
-
 ### Contributing
 This project is open-source, and contributions are welcome. Feel free to contribute or provide feedback of any kind.
 
