@@ -1,4 +1,4 @@
-package transformer
+package xml
 
 import (
 	"encoding/xml"
@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"gitgub.com/mstgnz/transformer"
+	"gitgub.com/mstgnz/transformer/node"
 	"github.com/pkg/errors"
 )
 
@@ -14,8 +16,8 @@ func IsXml(byt []byte) bool {
 	return xml.Unmarshal(byt, new(interface{})) == nil
 }
 
-// XmlRead Reads the given file, returns as byt
-func XmlRead(filename string) ([]byte, error) {
+// ReadXml Reads the given file, returns as byt
+func ReadXml(filename string) ([]byte, error) {
 	byt, err := os.ReadFile(filename)
 	if err != nil {
 		return byt, errors.Wrap(err, "cannot read the file")
@@ -26,11 +28,11 @@ func XmlRead(filename string) ([]byte, error) {
 	return byt, nil
 }
 
-// XmlDecode Converts a byte array to a key value struct.
-func XmlDecode(byt []byte) (*Node, error) {
+// DecodeXml Converts a byte array to a key value struct.
+func DecodeXml(byt []byte) (*node.Node, error) {
 	var (
-		knot   *Node
-		parent *Node
+		knot   *node.Node
+		parent *node.Node
 	)
 	dec := xml.NewDecoder(strings.NewReader(string(byt)))
 	var (
@@ -62,14 +64,14 @@ func XmlDecode(byt []byte) (*Node, error) {
 				}
 			}
 			if objStart {
-				knot = knot.AddToNextWithAttr(knot, parent, key, &Node{}, attr)
+				knot = knot.AddToNextWithAttr(knot, parent, key, &node.Node{}, attr)
 			}
 			objStart = true
 		case xml.CharData:
 			if !objStart {
 				continue
 			}
-			val := StripSpaces(string(kind))
+			val := transformer.StripSpaces(string(kind))
 			if len(val) > 0 {
 				if firstChild {
 					knot = knot.AddToValueWithAttr(knot, parent, key, val, attr)
@@ -81,8 +83,8 @@ func XmlDecode(byt []byte) (*Node, error) {
 					}
 				}
 			} else {
-				knot = knot.AddToNextWithAttr(knot, parent, key, &Node{Prev: knot}, attr)
-				knot = ConvertToNode(knot.Value)
+				knot = knot.AddToNextWithAttr(knot, parent, key, &node.Node{Prev: knot}, attr)
+				knot = transformer.ConvertToNode(knot.Value)
 				firstChild = true
 			}
 			parent = knot
@@ -101,6 +103,6 @@ func XmlDecode(byt []byte) (*Node, error) {
 }
 
 // NodeToXml TODO
-func NodeToXml(node *Node) ([]byte, error) {
+func NodeToXml(node *node.Node) ([]byte, error) {
 	return nil, nil
 }
