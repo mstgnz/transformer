@@ -1,8 +1,10 @@
-package transformer
+package json
 
 import (
 	"reflect"
 	"testing"
+
+	"gitgub.com/mstgnz/transformer/node"
 )
 
 func TestIsJSON(t *testing.T) {
@@ -32,20 +34,20 @@ func TestJsonDecode(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *Node
+		want    *node.Node
 		wantErr bool
 	}{
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := JsonDecode(tt.args.byt)
+			got, err := DecodeJson(tt.args.byt)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("JsonDecode() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("DecodeJson() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("JsonDecode() got = %v, want %v", got, tt.want)
+				t.Errorf("DecodeJson() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -65,13 +67,13 @@ func TestJsonRead(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := JsonRead(tt.args.filename)
+			got, err := ReadJson(tt.args.filename)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("JsonRead() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ReadJson() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("JsonRead() got = %v, want %v", got, tt.want)
+				t.Errorf("ReadJson() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -79,7 +81,7 @@ func TestJsonRead(t *testing.T) {
 
 func TestNodeToJson(t *testing.T) {
 	type args struct {
-		node *Node
+		node *node.Node
 	}
 	tests := []struct {
 		name    string
