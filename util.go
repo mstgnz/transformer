@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode"
 
+	"gitgub.com/mstgnz/transformer/node"
 	"github.com/fatih/color"
 )
 
@@ -28,8 +29,8 @@ func Contains[T comparable](s []T, e T) bool {
 }
 
 // ConvertToNode convert to Node
-func ConvertToNode(value any) *Node {
-	if knot, ok := value.(*Node); ok {
+func ConvertToNode(value any) *node.Node {
+	if knot, ok := value.(*node.Node); ok {
 		return knot
 	}
 	return nil
