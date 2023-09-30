@@ -15,9 +15,5 @@ func json() {
 	}
 	knot, _ := transformer.JsonDecode(byt)
 
-	obj, ok := knot.GetNode(nil, "containerPort")[1].(*transformer.Node)
-	if ok {
-		fmt.Println(obj.Value)
-	}
-
+	fmt.Println(knot.GetNode(nil, "containerPort")[0].Value)
 }

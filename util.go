@@ -29,8 +29,10 @@ func Contains[T comparable](s []T, e T) bool {
 
 // ConvertToNode convert to Node
 func ConvertToNode(value any) *Node {
-	knot, _ := value.(*Node)
-	return knot
+	if knot, ok := value.(*Node); ok {
+		return knot
+	}
+	return nil
 }
 
 // ConvertToSlice convert to any slice
