@@ -17,6 +17,6 @@ func runYml() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fmt.Println(knot)
+	fmt.Println(knot.Key)
 
 }

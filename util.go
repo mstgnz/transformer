@@ -11,14 +11,16 @@ import (
 	"github.com/fatih/color"
 )
 
-// ErrorHandle wrap error
+// ErrorHandle
+// wrap error
 func ErrorHandle(err error) {
 	if err != nil {
 		log.Printf(err.Error())
 	}
 }
 
-// Contains generic func for array contains any type
+// Contains
+// generic func for array contains any type
 func Contains[T comparable](s []T, e T) bool {
 	for _, v := range s {
 		if v == e {
@@ -28,7 +30,8 @@ func Contains[T comparable](s []T, e T) bool {
 	return false
 }
 
-// ConvertToNode convert to Node
+// ConvertToNode
+// convert to Node
 func ConvertToNode(value any) *node.Node {
 	if knot, ok := value.(*node.Node); ok {
 		return knot
@@ -36,13 +39,15 @@ func ConvertToNode(value any) *node.Node {
 	return nil
 }
 
-// ConvertToSlice convert to any slice
+// ConvertToSlice
+// convert to any slice
 func ConvertToSlice(value any) []any {
 	slc, _ := value.([]any)
 	return slc
 }
 
-// StripSpaces remove all spaces
+// StripSpaces
+// remove all spaces
 func StripSpaces(str string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.IsSpace(r) {
@@ -54,7 +59,8 @@ func StripSpaces(str string) string {
 	}, str)
 }
 
-// PrintErr with format
+// PrintErr
+// with format
 func PrintErr(format string, args ...any) {
 	_, err := fmt.Fprintf(os.Stderr, color.RedString("error: "+format+"\n"), args...)
 	if err != nil {
