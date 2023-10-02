@@ -6,196 +6,206 @@ import (
 	"github.com/fatih/color"
 )
 
-// Node We decode json, xml and yaml formats with a single node.
+// Node
+// This Node structure is a double linked list structure.
+// Parent Node link has been added because nested objects are in question.
+// Since Json, Yaml and Xml objects are nested, the Value type of our Node structure is designed as a Value structure.
+// This Node structure accommodates 3 file types, allows you to do the necessary manipulations and outputs the file type you want.
 type Node struct {
 	Key    string
-	Value  any
-	Attr   map[string]string
+	Value  Value
 	Next   *Node
 	Prev   *Node
 	Parent *Node
 }
 
-// AddToNext
-// If the given node is zero, it overwrites and returns.
-// If knot is not nil, it adds a new node to the next one and returns the newly formed node.
-// Params
-// knot is the working node.
-// parent is the parent of the current node.
-// key is the key name
-// value supports multiple types. The ones we use are slice, node, string, float etc.
-func (n *Node) AddToNext(knot *Node, parent *Node, key string, value any) *Node {
+// Value struct type of Node Value.
+// This Value structure is enriched to accommodate 3 file types.
+// For each Node, only one of the values of the Value structure can be set (should be)
+type Value struct {
+	Node  *Node
+	Slice []Value
+	Worth string
+	Attr  map[string]string // for xml
+}
+
+// AddToStart
+// Adds Node to the root of our node.
+// Our root Node becomes the Next of the new root Node.
+// If the knot that comes as a parameter is not nil, do the operation. Node usage should be implemented accordingly.
+func (n *Node) AddToStart(knot *Node) *Node {
 	if knot == nil {
-		knot = &Node{Key: key, Value: value}
-		return knot
+		return nil
 	}
-	knot.Next = &Node{Key: key, Value: value, Prev: knot, Parent: parent}
+	temp := *n
+	*n = *knot
+	n.Next = &temp
+	n.Next.Prev = n
+	if n.Next.Next != nil {
+		n.Next.Next.Prev = n.Next
+	}
+	return n
+}
+
+// AddToNext
+// Adds a new Node next to the current Node and returns the new Node.
+// Prev of the newly created Node is the Node comes with the parameter.
+// The Parent comes as a parameter is the Parent of the Node to be created.
+// The nil control for the knot that comes as a parameter is only for the health of the flow.
+func (n *Node) AddToNext(knot *Node, parent *Node, key string) *Node {
+	if knot == nil {
+		return &Node{Key: key, Prev: knot, Parent: parent}
+	}
+	knot.Next = &Node{Key: key, Prev: knot, Parent: parent}
 	return knot.Next
 }
 
-// AddToNextWithAttr
-// It is the method used for the attribute feature in xml format, since we are running things through a single node.
-// Since the order of the attribute does not matter, it will be kept as a map.
-// Parameters are the same as AddToNext.
-func (n *Node) AddToNextWithAttr(knot *Node, parent *Node, key string, value any, attr map[string]string) *Node {
-	knot = knot.AddToNext(knot, parent, key, value)
-	knot.Attr = attr
-	return knot
-}
-
 // AddToValue
-// It is the method used if the value of a node is a node.
-// Parameters are the same as AddToNext.
-func (n *Node) AddToValue(knot *Node, parent *Node, key string, value any) *Node {
+// Sets the Value of the current Node to the given Value
+// If the Node in the given Value structure is not empty, it returns this Node.
+// If the Slice in the given Value structure is not empty and the last element of the Slice is a Node and not nil, return this Node.
+// The nil control for the Node that comes with the parameter is necessary for flow health. Node usage should be implemented accordingly.
+func (n *Node) AddToValue(knot *Node, value Value) *Node {
 	if knot == nil {
-		return &Node{Key: key, Value: value, Prev: knot, Parent: parent}
+		return nil
 	}
-	knot.Value = &Node{Key: key, Value: value, Prev: knot, Parent: parent}
-	if obj, ok := knot.Value.(*Node); ok {
-		return obj
-	}
-	return knot
-}
-
-// AddToValueWithAttr
-// It is the method used if the value of a node is a node.
-// Same as AddToNextWithAttr
-func (n *Node) AddToValueWithAttr(knot *Node, parent *Node, key string, value any, attr map[string]string) *Node {
-	knot = knot.AddToValue(knot, parent, key, value)
-	knot.Attr = attr
-	return knot
-}
-
-// SetToValue
-// It only allows the key and value to be set.
-func (n *Node) SetToValue(knot *Node, key string, value any) *Node {
-	if knot == nil {
-		return &Node{Key: key, Value: value}
-	}
-	knot.Key = key
 	knot.Value = value
-	return knot
-}
-
-// AddToArr
-// If the value of the node is a slice, it appends value.
-// Value supports multiple types. The ones we use are slice, node, string, float etc.
-func (n *Node) AddToArr(knot *Node, value any) *Node {
-	if knot == nil {
-		knot = &Node{Value: []any{value}}
-		return knot
+	if knot.Value.Node != nil {
+		return knot.Value.Node
 	}
-	if arr, ok := knot.Value.([]any); ok {
-		knot.Value = append(arr, value)
+	if size := len(knot.Value.Slice); size > 0 {
+		slcNode := knot.Value.Slice[size-1].Node
+		if slcNode != nil {
+			return slcNode
+		}
 	}
 	return knot
 }
 
-// AddObjToArr
-// If the value of the node is a slice, it appends *Node.
-func (n *Node) AddObjToArr(knot *Node) *Node {
-	if knot == nil {
-		knot = &Node{}
-		return knot
+// AddToEnd
+// It adds the Node comes with the parameter to the Next of the last Node of our Node.
+// nil control for knot coming with the parameter is not required as it will not cause an error.
+func (n *Node) AddToEnd(knot *Node) *Node {
+	if n == nil {
+		return nil
 	}
-	newObj := &Node{Prev: knot, Parent: knot}
-	if arr, ok := knot.Value.([]any); ok {
-		knot.Value = append(arr, newObj)
+	iter := n
+	for iter.Next != nil {
+		iter = iter.Next
 	}
-	return newObj
+	knot.Prev = iter
+	iter.Next = knot
+	return knot
 }
 
-// GetNode search Node
-func (n *Node) GetNode(knot *Node, key string) []*Node {
+// Delete
+// If the Node to be deleted is root, root's next is assigned as the new root.
+func (n *Node) Delete(knot *Node) *Node {
+	if n == knot {
+		*n = *n.Next
+		return n
+	}
+	// If the node to be deleted is in between or at the end, we move our iter object to the previous node of the node to be deleted.
+	for n.Next != nil && n.Next != knot {
+		*n = *n.Next
+	}
+	if n.Next != nil {
+		if n.Next.Next != nil {
+			n.Next = n.Next.Next
+			n.Next.Prev = n
+		} else {
+			n.Next = nil
+		}
+	}
+	return n
+}
+
+// GetNode
+// It searches nested according to the Key comes as a parameter.
+func (n *Node) GetNode(key string) []*Node {
 	var list []*Node
 	var search func(node *Node)
 	search = func(node *Node) {
-		if node == nil {
-			return
-		}
 		for node != nil {
 			if node.Key == key {
 				list = append(list, node)
 			}
-			// if Node value is object
-			if obj, ok := node.Value.(*Node); ok {
-				search(obj)
+			// if Node Value.Node exists
+			if node.Value.Node != nil {
+				search(node.Value.Node)
 			}
-			// if Node value is array and if value in object
-			if arr, ok := node.Value.([]any); ok {
-				for _, v := range arr {
-					if obj, ok := v.(*Node); ok {
-						search(obj)
+			// if Node Value.Slice exists
+			if len(node.Value.Slice) > 0 {
+				for _, slc := range node.Value.Slice {
+					// if Slice.Value.Node exists
+					if slc.Node != nil {
+						search(slc.Node)
 					}
 				}
 			}
 			node = node.Next
 		}
 	}
-	if knot == nil {
-		knot = n.Reset()
-	}
-	search(knot)
+	search(n.Reset())
 	return list
 }
 
-// Print Node
-func (n *Node) Print(knot *Node) {
+// Print
+// TODO refactor
+func (n *Node) Print() {
 	var write func(node *Node)
 	write = func(node *Node) {
 		for node != nil {
 			if node.Parent == nil {
 				fmt.Println(color.BlueString("main"))
 			}
-			write(node)
-			// if Node value is object
-			if obj, ok := node.Value.(*Node); ok {
-				name := node.Key
-				if len(name) == 0 {
-					name = "array object"
+			print(node)
+			// if Node Value.Node exists
+			if node.Value.Node != nil {
+				if len(node.Key) == 0 {
+					node.Key = "array object"
 				}
-				fmt.Println(color.BlueString(fmt.Sprintf("child for %v", name)))
-				write(obj)
+				fmt.Println(color.BlueString(fmt.Sprintf("child for %v", node.Key)))
+				print(node.Value.Node)
 			}
-			// if Node value is array and if value in object
-			if arr, ok := node.Value.([]any); ok {
-				for _, v := range arr {
-					if obj, ok := v.(*Node); ok {
+			// if Node Value.Slice exists
+			if len(node.Value.Slice) > 0 {
+				for _, slc := range node.Value.Slice {
+					// if Slice.Value.Node exists
+					if slc.Node != nil {
 						fmt.Println(color.BlueString(fmt.Sprintf("child for %v %s", node.Key, "in object")))
-						write(obj)
+						print(slc.Node)
 					}
 				}
 			}
 			node = node.Next
 		}
 	}
-	if knot == nil {
-		knot = n.Reset()
-	}
-	write(knot)
+	write(n.Reset())
 }
 
-func (n *Node) print(iter *Node) {
-	fmt.Printf("%v %v %v %v %v %v %v %v\n",
+// print It belongs to Print
+func (n *Node) print(knot *Node) {
+	fmt.Printf("%v %v %v %v %v %v\n",
 		color.YellowString("Key: "),
-		iter.Key,
+		knot.Key,
 		color.YellowString("Value:"),
-		iter.Value,
-		color.YellowString("Attr:"),
-		iter.Attr,
+		knot.Value,
 		color.YellowString("Parent:"),
-		iter.Parent)
+		knot.Parent)
 }
 
-// Exists Node
-func (n *Node) Exists() bool {
-	return n != nil
-}
-
+// Reset
+// It goes to the root of our Node.
 func (n *Node) Reset() *Node {
 	iter := n
 	for iter.Prev != nil {
 		iter = iter.Prev
 	}
 	return iter
+}
+
+// Exists Node
+func (n *Node) Exists() bool {
+	return n != nil
 }
