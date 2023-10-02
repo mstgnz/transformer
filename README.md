@@ -19,6 +19,8 @@ Our structure will hold the next, previous and parent objects along with the key
 
 File conversion will be made easier using this package.
 
+![Double Linked List](transformer.png)
+
 ### Contributing
 This project is open-source, and contributions are welcome. Feel free to contribute or provide feedback of any kind.
 
