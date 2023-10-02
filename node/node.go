@@ -24,7 +24,7 @@ type Node struct {
 // For each Node, only one of the values of the Value structure can be set (should be)
 type Value struct {
 	Node  *Node
-	Slice []Value
+	Array []Value
 	Worth string
 	Attr  map[string]string // for xml
 }
@@ -63,7 +63,7 @@ func (n *Node) AddToNext(knot *Node, parent *Node, key string) *Node {
 // AddToValue
 // Sets the Value of the current Node to the given Value
 // If the Node in the given Value structure is not empty, it returns this Node.
-// If the Slice in the given Value structure is not empty and the last element of the Slice is a Node and not nil, return this Node.
+// If the Array in the given Value structure is not empty and the last element of the Array is a Node and not nil, return this Node.
 // The nil control for the Node that comes with the parameter is necessary for flow health. Node usage should be implemented accordingly.
 func (n *Node) AddToValue(knot *Node, value Value) *Node {
 	if knot == nil {
@@ -73,8 +73,8 @@ func (n *Node) AddToValue(knot *Node, value Value) *Node {
 	if knot.Value.Node != nil {
 		return knot.Value.Node
 	}
-	if size := len(knot.Value.Slice); size > 0 {
-		slcNode := knot.Value.Slice[size-1].Node
+	if size := len(knot.Value.Array); size > 0 {
+		slcNode := knot.Value.Array[size-1].Node
 		if slcNode != nil {
 			return slcNode
 		}
@@ -134,10 +134,10 @@ func (n *Node) GetNode(key string) []*Node {
 			if node.Value.Node != nil {
 				search(node.Value.Node)
 			}
-			// if Node Value.Slice exists
-			if len(node.Value.Slice) > 0 {
-				for _, slc := range node.Value.Slice {
-					// if Slice.Value.Node exists
+			// if Node Value.Array exists
+			if len(node.Value.Array) > 0 {
+				for _, slc := range node.Value.Array {
+					// if Array.Value.Node exists
 					if slc.Node != nil {
 						search(slc.Node)
 					}
@@ -168,10 +168,10 @@ func (n *Node) Print() {
 				fmt.Println(color.BlueString(fmt.Sprintf("child for %v", node.Key)))
 				print(node.Value.Node)
 			}
-			// if Node Value.Slice exists
-			if len(node.Value.Slice) > 0 {
-				for _, slc := range node.Value.Slice {
-					// if Slice.Value.Node exists
+			// if Node Value.Array exists
+			if len(node.Value.Array) > 0 {
+				for _, slc := range node.Value.Array {
+					// if Array.Value.Node exists
 					if slc.Node != nil {
 						fmt.Println(color.BlueString(fmt.Sprintf("child for %v %s", node.Key, "in object")))
 						print(slc.Node)

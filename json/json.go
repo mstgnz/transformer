@@ -94,7 +94,7 @@ func jsonDelim(token json.Token, value string) {
 			// If objStart is true then the initial value of the Node is set.
 			if objStart {
 				//Knot = Knot.AddToValue(Knot, parent, key, []any{})
-				Knot = Knot.AddToValue(Knot, node.Value{Slice: []node.Value{}})
+				Knot = Knot.AddToValue(Knot, node.Value{Array: []node.Value{}})
 			} else {
 				// If objStart is false, a new Node is created next to the current Node.
 				//Knot = Knot.AddToNext(Knot, parent, key, []any{})
@@ -108,7 +108,7 @@ func jsonDelim(token json.Token, value string) {
 		} else {
 			// If there is no key, it is a nested array.
 			//Knot = Knot.AddToArr(Knot, value)
-			Knot.Value.Slice = append(Knot.Value.Slice, node.Value{Worth: value})
+			Knot.Value.Array = append(Knot.Value.Array, node.Value{Worth: value})
 		}
 	case "]": // set close array
 		arrCount--
