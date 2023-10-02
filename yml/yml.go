@@ -8,12 +8,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// IsYml Checks if the given file is in xml format.
+// IsYml
+// Checks if the given file is in xml format.
 func IsYml(byt []byte) bool {
 	return yaml.Unmarshal(byt, &yaml.Node{}) == nil
 }
 
-// ReadYml Reads the given file, returns as byt
+// ReadYml
+// Reads the given file, returns as byt
 func ReadYml(filename string) ([]byte, error) {
 	byt, err := os.ReadFile(filename)
 	if err != nil {
@@ -25,8 +27,8 @@ func ReadYml(filename string) ([]byte, error) {
 	return byt, nil
 }
 
-// DecodeYml TODO
-// DecodeYml Converts a byte array to a key value struct.
+// DecodeYml
+// Converts a byte array to a key value struct.
 func DecodeYml(byt []byte) (*node.Node, error) {
 	var (
 		knot *node.Node
@@ -49,7 +51,8 @@ func DecodeYml(byt []byte) (*node.Node, error) {
 	return knot, nil
 }
 
-// NodeToYml TODO
+// NodeToYml
+// TODO implement
 func NodeToYml(node *node.Node) ([]byte, error) {
 	return nil, nil
 }
