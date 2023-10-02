@@ -77,7 +77,6 @@ func jsonDelim(token json.Token, value string) {
 		// If the key is empty; There is an array object, and the Node will be created in the array and the newly added Node will be returned.
 		if arrStart && len(key) == 0 {
 			// An object only starts without a key in an array.
-			//Knot = Knot.AddObjToArr(Knot)
 			Knot = Knot.AddToValue(Knot, node.Value{Node: &node.Node{Prev: Knot}})
 		} else {
 			Knot = Knot.AddToNext(Knot, Parent, key)
@@ -93,11 +92,9 @@ func jsonDelim(token json.Token, value string) {
 		if len(key) > 0 {
 			// If objStart is true then the initial value of the Node is set.
 			if objStart {
-				//Knot = Knot.AddToValue(Knot, parent, key, []any{})
 				Knot = Knot.AddToValue(Knot, node.Value{Array: []node.Value{}})
 			} else {
 				// If objStart is false, a new Node is created next to the current Node.
-				//Knot = Knot.AddToNext(Knot, parent, key, []any{})
 				Knot = Knot.AddToNext(Knot, Parent, key)
 			}
 			Parent = Knot
@@ -107,8 +104,7 @@ func jsonDelim(token json.Token, value string) {
 			key = ""
 		} else {
 			// If there is no key, it is a nested array.
-			//Knot = Knot.AddToArr(Knot, value)
-			Knot.Value.Array = append(Knot.Value.Array, node.Value{Worth: value})
+			_ = append(Knot.Value.Array, node.Value{Worth: value})
 		}
 	case "]": // set close array
 		arrCount--
@@ -139,16 +135,16 @@ func nonJsonDelim(_ json.Token, value string) {
 		// If an array object is open, this key value is essentially an array object.
 		// If the array is not empty
 		if arrStart {
-			//Knot = Knot.AddToArr(Knot, value)
+			_ = append(Knot.Value.Array, node.Value{Worth: value})
 		} else {
 			key = value
 		}
 	} else {
 		// If objStart is true then the initial value of the Node is set.
 		if objStart {
-			//Knot = Knot.AddToValue(Knot, parent, key, value)
+			Knot = Knot.AddToValue(Knot, node.Value{Worth: value})
 		} else {
-			//Knot = Knot.AddToNext(Knot, parent, key, value)
+			Knot = Knot.AddToNext(Knot, Parent, key)
 		}
 		// Here objStart and key values are reset.
 		objStart = false

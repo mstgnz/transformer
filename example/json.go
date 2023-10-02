@@ -14,7 +14,8 @@ func runJson() {
 		log.Fatalln(err)
 	}
 	knot, _ := json.DecodeJson(byt)
+	knot = knot.Reset()
 
-	fmt.Println(knot.Key)
+	fmt.Println(knot.Next.Next.Value)
 	//fmt.Println(knot.GetNode(nil, "test")[0].Value)
 }
