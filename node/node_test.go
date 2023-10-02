@@ -74,27 +74,27 @@ func TestNode_AddToValue(t *testing.T) {
 	if got := node.Value.Attr; !reflect.DeepEqual(got, attr) {
 		t.Errorf("key expected=%v, got=%v", attr, got)
 	}
-	// test slice
+	// test array
 	attr = map[string]string{"slc": "value"}
 	node = node.AddToValue(node, Value{
-		Slice: []Value{
+		Array: []Value{
 			{Worth: "slc value"},
 			{Attr: attr},
-			{Slice: []Value{{}, {Worth: "middle"}, {}}},
+			{Array: []Value{{}, {Worth: "middle"}, {}}},
 		},
 	})
-	if got := node.Value.Slice[0].Worth; !reflect.DeepEqual(got, "slc value") {
+	if got := node.Value.Array[0].Worth; !reflect.DeepEqual(got, "slc value") {
 		t.Errorf("key expected=%v, got=%v", "slc value", got)
 	}
-	if got := node.Value.Slice[1].Attr; !reflect.DeepEqual(got, attr) {
+	if got := node.Value.Array[1].Attr; !reflect.DeepEqual(got, attr) {
 		t.Errorf("key expected=%v, got=%v", attr, got)
 	}
-	if got := node.Value.Slice[2].Slice[1].Worth; !reflect.DeepEqual(got, "middle") {
+	if got := node.Value.Array[2].Array[1].Worth; !reflect.DeepEqual(got, "middle") {
 		t.Errorf("key expected=%v, got=%v", "middle", got)
 	}
-	// test slice with node
+	// test array with node
 	node = node.AddToValue(node, Value{
-		Slice: []Value{
+		Array: []Value{
 			{Node: &Node{Key: "slc node key"}},
 		},
 	})
