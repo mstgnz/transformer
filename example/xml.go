@@ -14,6 +14,6 @@ func runXml() {
 		log.Fatalln(err)
 	}
 	knot, _ := xml.DecodeXml(byt)
-	fmt.Println(knot.GetNode(nil, "test")[0].Value)
+	fmt.Println(knot.Key)
 
 }
