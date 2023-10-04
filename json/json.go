@@ -19,33 +19,32 @@ var (
 	Parent *node.Node
 
 	key      string
-	value    string
 	objStart bool
 	arrStart bool
 	arrCount int
 )
 
-// IsJSON
-// Checks if the given file is in json format.
-func IsJSON(data []byte) bool {
+// IsJson
+// Checks if the given byte slice is in JSON format.
+func IsJson(data []byte) bool {
 	return json.Unmarshal(data, new(map[string]any)) == nil
 }
 
 // ReadJson
-// Reads the given file, returns as byt
+// Reads the given file, returns its content as a byte slice.
 func ReadJson(filename string) ([]byte, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return data, errors.Wrap(err, "cannot read the file")
 	}
-	if ok := IsJSON(data); !ok {
-		return data, errors.Wrap(errors.New("this file is not json"), "this file is not json")
+	if ok := IsJson(data); !ok {
+		return data, errors.Wrap(errors.New("this file is not JSON"), "this file is not JSON")
 	}
 	return data, nil
 }
 
 // DecodeJson
-// Converts a byte array to a key value struct.
+// Converts a byte slice to a `node.Node` structure.
 func DecodeJson(data []byte) (*node.Node, error) {
 	dec := json.NewDecoder(strings.NewReader(string(data)))
 	for {
@@ -53,8 +52,8 @@ func DecodeJson(data []byte) (*node.Node, error) {
 		if err == io.EOF || err != nil {
 			return Knot, errors.Wrap(err, "no more")
 		}
-		// Get type and value of t object in each loop
-		value = fmt.Sprintf("%v", token)
+		// Get type and value of the token object in each loop
+		value := fmt.Sprintf("%v", token)
 		// If the type of the object is json.Delim
 		if reflect.TypeOf(token).String() == "json.Delim" {
 			jsonDelim(token, value)
@@ -66,14 +65,14 @@ func DecodeJson(data []byte) (*node.Node, error) {
 
 // jsonDelim
 func jsonDelim(token json.Token, value string) {
-	// If no Node has been created yet, don't enter here, skip json start -> {
+	// If no Node has been created yet, don't enter here, skip JSON start -> {
 	if !Knot.Exists() {
 		return
 	}
-	// If the value of object t is json object or array
+	// If the value of object token is a JSON object or array
 	switch value {
 	case "{": // set open object - {
-		// If the key is not empty; this is an object. A new Node will be added next to the existing Node and the newly added Node will return.
+		// If the key is not empty; this is an object. A new Node will be added next to the existing Node, and the newly added Node will return.
 		// If the key is empty; There is an array object, and the Node will be created in the array and the newly added Node will be returned.
 		if arrStart && len(key) == 0 {
 			// An object only starts without a key in an array.
@@ -86,11 +85,11 @@ func jsonDelim(token json.Token, value string) {
 		arrStart = false
 		key = ""
 	case "[": // set open array - [
-		// If key is not null and objStart is true; The initial value of the Node will be set.
-		// If key is not empty and objStart is false; A new Node will be created next to the Node.
+		// If the key is not null and objStart is true; The initial value of the Node will be set.
+		// If the key is not empty and objStart is false; A new Node will be created next to the Node.
 		// If the key is empty; this is a nested array object. will be added directly to the current Node's array.
 		if len(key) > 0 {
-			// If objStart is true then the initial value of the Node is set.
+			// If objStart is true, then the initial value of the Node is set.
 			if objStart {
 				Knot = Knot.AddToValue(Knot, node.Value{Array: []node.Value{}})
 			} else {
@@ -130,9 +129,9 @@ func jsonDelim(token json.Token, value string) {
 // nonJsonDelim
 func nonJsonDelim(_ json.Token, value string) {
 	// If the loop object is not a json.Delim, the key and value fields will be set.
-	// Since the json object is a key value pair, first the key will be set and then the value will be set.
+	// Since the JSON object is a key-value pair, first the key will be set and then the value will be set.
 	if len(key) == 0 {
-		// If an array object is open, this key value is essentially an array object.
+		// If an array object is open, this key-value is essentially an array object.
 		// If the array is not empty
 		if arrStart {
 			_ = append(Knot.Value.Array, node.Value{Worth: value})
@@ -140,7 +139,7 @@ func nonJsonDelim(_ json.Token, value string) {
 			key = value
 		}
 	} else {
-		// If objStart is true then the initial value of the Node is set.
+		// If objStart is true, then the initial value of the Node is set.
 		if objStart {
 			Knot = Knot.AddToValue(Knot, node.Value{Worth: value})
 		} else {
