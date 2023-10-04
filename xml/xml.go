@@ -34,17 +34,15 @@ func ReadXml(filename string) ([]byte, error) {
 // Converts a byte array to a key value struct.
 func DecodeXml(byt []byte) (*node.Node, error) {
 	var (
-		knot *node.Node
-		//parent *node.Node
-	)
-	dec := xml.NewDecoder(strings.NewReader(string(byt)))
-	var (
+		knot       *node.Node
+		parent     *node.Node
 		key        string
 		arrCount   int
 		objStart   bool
 		firstChild bool
 		attr       map[string]string
 	)
+	dec := xml.NewDecoder(strings.NewReader(string(byt)))
 
 	for {
 		t, err := dec.Token()
@@ -53,12 +51,9 @@ func DecodeXml(byt []byte) (*node.Node, error) {
 		}
 		switch kind := t.(type) {
 		case xml.ProcInst:
-			continue
+			knot = &node.Node{}
 		case xml.StartElement:
 			key = kind.Name.Local
-			if key == "root" {
-				continue
-			}
 			// Attr
 			attr = map[string]string{}
 			if len(kind.Attr) > 0 {
@@ -67,7 +62,9 @@ func DecodeXml(byt []byte) (*node.Node, error) {
 				}
 			}
 			if objStart {
-				//knot = knot.AddToNextWithAttr(knot, parent, key, &node.Node{}, attr)
+				knot.Key = key
+				knot.Parent = parent
+				knot.Value.Attr = attr
 			}
 			objStart = true
 		case xml.CharData:
@@ -77,6 +74,7 @@ func DecodeXml(byt []byte) (*node.Node, error) {
 			val := transformer.StripSpaces(string(kind))
 			if len(val) > 0 {
 				if firstChild {
+					knot.Value.Worth = val
 					//knot = knot.AddToValueWithAttr(knot, parent, key, val, attr)
 				} else {
 					if arrCount > 0 {
@@ -86,20 +84,20 @@ func DecodeXml(byt []byte) (*node.Node, error) {
 					}
 				}
 			} else {
-				//knot = knot.AddToNextWithAttr(knot, parent, key, &node.Node{Prev: knot}, attr)
-				knot = transformer.ConvertToNode(knot.Value)
+				parent = knot
+				knot = knot.Value.Node
+				knot.Parent = parent
 				firstChild = true
 			}
-			//parent = knot
-			objStart = false
 		case xml.EndElement:
+			objStart = false
 			if arrCount > 0 {
 				arrCount--
 			}
 			//parent = nil
 			if knot.Parent != nil {
 				knot = knot.Parent
-				//parent = knot
+				parent = knot
 			}
 		}
 	}

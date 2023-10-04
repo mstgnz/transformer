@@ -1,0 +1,81 @@
+StartElement root [] 				- 1.node, set Key and Value.Attr
+CharData 							- if CharData is null, this is child node: 2.node=1.node.Value.Node, 2.node.Prev=1.node 2.node.Parent=1.node
+StartElement apiVersion []			- 2.node set Key and Value.Attr
+CharData v1							- 2.node set Value.Worth
+EndElement apiVersion				- 3.node = 2.node.Next, 3.node.Prev = 2.node, 3.node.Parent = 2.node.Parent
+StartElement kind []				- 3.node set Key and Value.Attr
+CharData Pod						- 3.node set Value.Worth
+EndElement kind						- 4.node = 3.node.Next, 4.node.Prev=3.node, 4.node.Parent=3.node.Parent
+StartElement thing [{{ prop} 2} {{ version} 4.5}] - 4.node set Key and Value.Attr
+CharData 4.56						- 4.node set Value.Worth
+EndElement thing					- 5.node = 4.node.Next, 5.node.Prev=4.node, 5.node.Parent=4.node.Parent
+StartElement metadata []			- 5.node set Key and Value.Attr
+CharData							- if CharData is null, this is child node: 6.node=5.node.Value.Node, 6.node.Prev=5.Node, 6.Node.Parent=5.node
+StartElement name []				- 6.node set Key and Value.Attr
+CharData rss-site					- 6.node set Value.Attr
+EndElement name						- 7.node = 6.node.Next, 7.node.Prev=6.node, 7.node.Parent=6.node.Parent
+StartElement labels []				- 7.node set Key and Value.Attr
+CharData							- if CharData is null, this is child node: 8.node=7.node.Value.Node
+StartElement app []
+CharData web
+EndElement app
+EndElement labels
+EndElement metadata
+StartElement spec []
+CharData
+StartElement containers []
+CharData
+StartElement name []
+CharData front-end
+EndElement name
+StartElement image []
+CharData nginx
+EndElement image
+StartElement ports []
+CharData
+StartElement containerPort []
+CharData 80
+EndElement containerPort
+StartElement port [{{ port} 34}]
+CharData 34
+EndElement port
+StartElement port []
+CharData 55
+EndElement port
+StartElement status [{{ status} on}]
+CharData on
+EndElement status
+StartElement status []
+CharData off
+EndElement status
+EndElement ports
+EndElement containers
+StartElement containers []
+CharData
+StartElement name []
+CharData rss-reader
+EndElement name
+StartElement image [{{ img} nginx}]
+CharData a/rss-php-nginx:v1
+EndElement image
+StartElement ports []
+CharData
+StartElement containerPort []
+CharData 0.23
+EndElement containerPort
+StartElement test []
+CharData 23
+EndElement test
+StartElement test []
+CharData 334
+EndElement test
+StartElement test [{{ type} old}]
+CharData old
+EndElement test
+StartElement test []
+CharData new
+EndElement test
+EndElement ports
+EndElement containers
+EndElement spec
+EndElement root
