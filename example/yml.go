@@ -13,10 +13,11 @@ func runYml() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	knot, err := yml.DecodeYml(byt)
-	if err != nil {
-		log.Fatalln(err)
+	knot, _ := yml.DecodeYml(byt)
+	knot = knot.Reset()
+	for knot.Next != nil {
+		fmt.Println(knot.Key)
+		knot = knot.Next
 	}
-	fmt.Println(knot.Key)
 
 }

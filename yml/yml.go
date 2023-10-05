@@ -29,26 +29,46 @@ func ReadYml(filename string) ([]byte, error) {
 
 // DecodeYml
 // Converts a byte array to a key value struct.
-func DecodeYml(byt []byte) (*node.Node, error) {
+func DecodeYml(data []byte) (*node.Node, error) {
 	var (
-		knot *node.Node
-		yam  yaml.Node
-		//parent *Node
+		Knot   *node.Node
+		Parent *node.Node
+		dec    yaml.Node
+		parser func(node *yaml.Node)
 	)
 
 	// Decode File
-	err := yaml.Unmarshal(byt, &yam)
+	err := yaml.Unmarshal(data, &dec)
 	if err != nil {
-		return knot, err
+		return Knot, err
 	}
 
-	/*// Encode
-	enc := yaml.NewEncoder(os.Stdout)
-	enc.SetIndent(2)
-	err = enc.Encode(yam.Content[0])
-	ErrorHandle(err)*/
+	// recursive
+	parser = func(yam *yaml.Node) {
+		indent := 0
+		current := 0
+		for k, child := range yam.Content {
+			// mod 2 = Key
+			if k%2 == 0 {
+				indent = child.Column - 1
+				Knot = Knot.AddToNext(Knot, Parent, child.Value)
+			} else {
+				if child.Kind == yaml.MappingNode {
+					Knot = Knot.AddToValue(Knot, node.Value{})
+				} else {
+					Knot.Value.Worth = child.Value
+				}
+			}
+			if current > indent {
+				// end objet
+				Parent = Knot.Parent
+			}
+			parser(child)
+		}
+	}
+	parser(dec.Content[0])
 
-	return knot, nil
+	return Knot, nil
 }
 
 // NodeToYml
