@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/fatih/color"
 )
@@ -154,27 +155,27 @@ func (n *Node) GetNode(key string) []*Node {
 // TODO refactor
 func (n *Node) Print() {
 	var write func(node *Node)
+	level := 0
 	write = func(node *Node) {
 		for node != nil {
-			if node.Parent == nil {
-				fmt.Println(color.BlueString("main"))
-			}
-			print(node)
+			node.print(node, level)
 			// if Node Value.Node exists
 			if node.Value.Node != nil {
 				if len(node.Key) == 0 {
 					node.Key = "array object"
 				}
-				fmt.Println(color.BlueString(fmt.Sprintf("child for %v", node.Key)))
-				print(node.Value.Node)
+				level++
+				node.print(node.Value.Node, level)
+				write(node.Value.Node)
 			}
 			// if Node Value.Array exists
 			if len(node.Value.Array) > 0 {
 				for _, slc := range node.Value.Array {
 					// if Array.Value.Node exists
 					if slc.Node != nil {
-						fmt.Println(color.BlueString(fmt.Sprintf("child for %v %s", node.Key, "in object")))
-						print(slc.Node)
+						level++
+						node.print(slc.Node, level)
+						write(slc.Node)
 					}
 				}
 			}
@@ -185,20 +186,23 @@ func (n *Node) Print() {
 }
 
 // print It belongs to Print
-func (n *Node) print(knot *Node) {
-	fmt.Printf("%v %v %v %v %v %v\n",
+func (n *Node) print(knot *Node, level int) {
+	indent := strings.Repeat("  ", level)
+	fmt.Printf("%s%v %v %v %+v\n",
+		indent,
 		color.YellowString("Key: "),
 		knot.Key,
 		color.YellowString("Value:"),
-		knot.Value,
-		color.YellowString("Parent:"),
-		knot.Parent)
+		knot.Value)
 }
 
 // Reset
 // It goes to the root of our Node.
 func (n *Node) Reset() *Node {
 	iter := n
+	for iter.Parent != nil {
+		iter = iter.Parent
+	}
 	for iter.Prev != nil {
 		iter = iter.Prev
 	}
