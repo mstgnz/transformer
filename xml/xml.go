@@ -84,17 +84,20 @@ func DecodeXml(byt []byte) (*node.Node, error) {
 }
 
 // NodeToXml byte
+// TODO nested structure cannot be provided, will be refactored.
 func NodeToXml(knot *node.Node) (string, error) {
 	var xmlBuilder strings.Builder
 	xmlBuilder.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>")
 	var generate func(node *node.Node)
 	generate = func(node *node.Node) {
 		for node != nil {
-			var attrBuilder strings.Builder
-			for k, v := range node.Value.Attr {
-				attrBuilder.WriteString(fmt.Sprintf(" %v=\"%v\"", k, v))
+			if len(node.Key) > 0 {
+				var attrBuilder strings.Builder
+				for k, v := range node.Value.Attr {
+					attrBuilder.WriteString(fmt.Sprintf(" %v=\"%v\"", k, v))
+				}
+				xmlBuilder.WriteString(fmt.Sprintf("<%v%v>%v</%v>", node.Key, attrBuilder.String(), node.Value.Worth, node.Key))
 			}
-			xmlBuilder.WriteString(fmt.Sprintf("<%v %v>%v</%v>", node.Key, attrBuilder, node.Value.Worth, node.Key))
 			// if Node Value.Node exists
 			if node.Value.Node != nil {
 				if len(node.Key) == 0 {
