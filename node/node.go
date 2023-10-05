@@ -152,33 +152,34 @@ func (n *Node) GetNode(key string) []*Node {
 }
 
 // Print
-// TODO refactor
+// You can get output to see the node tree structure.
 func (n *Node) Print() {
 	var write func(node *Node)
 	level := 0
 	write = func(node *Node) {
 		for node != nil {
 			node.print(node, level)
+
 			// if Node Value.Node exists
 			if node.Value.Node != nil {
 				if len(node.Key) == 0 {
-					node.Key = "array object"
+					node.Key = "array"
 				}
 				level++
-				node.print(node.Value.Node, level)
 				write(node.Value.Node)
 			}
+
 			// if Node Value.Array exists
 			if len(node.Value.Array) > 0 {
 				for _, slc := range node.Value.Array {
 					// if Array.Value.Node exists
 					if slc.Node != nil {
 						level++
-						node.print(slc.Node, level)
 						write(slc.Node)
 					}
 				}
 			}
+			level--
 			node = node.Next
 		}
 	}
