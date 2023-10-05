@@ -18,7 +18,7 @@ StartElement root [] 				        - 1.node, set Key and Value.Attr
             CharData						- 8.node=7.node.Value.Node if CharData is null, this is child node
             StartElement app []             - 8.node.Parent=7.node
                 CharData web                - 8.node.Value.Worth=web
-            EndElement app                  -
+            EndElement app                  - 
         EndElement labels                   -
     EndElement metadata                     - 5.node.Next=9.node
     StartElement spec []                    - 9.node.Prev=5.node
