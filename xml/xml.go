@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 
 	"gitgub.com/mstgnz/transformer"
@@ -34,71 +35,48 @@ func ReadXml(filename string) ([]byte, error) {
 // Converts a byte array to a key value struct.
 func DecodeXml(byt []byte) (*node.Node, error) {
 	var (
-		knot       *node.Node
-		parent     *node.Node
-		key        string
-		arrCount   int
-		objStart   bool
-		firstChild bool
-		attr       map[string]string
+		Knot   *node.Node
+		Parent *node.Node
+		isNext bool
 	)
 	dec := xml.NewDecoder(strings.NewReader(string(byt)))
 
 	for {
 		t, err := dec.Token()
 		if err == io.EOF || err != nil {
-			return knot, errors.Wrap(err, "no more")
+			return Knot, errors.Wrap(err, "no more")
 		}
+		if Knot == nil && reflect.TypeOf(t).Name() != "StartElement" {
+			continue
+		}
+		Knot = &node.Node{}
 		switch kind := t.(type) {
-		case xml.ProcInst:
-			knot = &node.Node{}
 		case xml.StartElement:
-			key = kind.Name.Local
+			key := kind.Name.Local
 			// Attr
-			attr = map[string]string{}
-			if len(kind.Attr) > 0 {
-				for i := 0; i < len(kind.Attr); i++ {
-					attr[kind.Attr[i].Name.Local] = kind.Attr[i].Value
-				}
+			attr := map[string]string{}
+			for _, a := range kind.Attr {
+				attr[a.Name.Local] = a.Value
 			}
-			if objStart {
-				knot.Key = key
-				knot.Parent = parent
-				knot.Value.Attr = attr
+			if isNext {
+				Knot = Knot.AddToNext(Knot, Parent, key)
+				Knot.Value.Attr = attr
+				isNext = false
+			} else {
+				Knot.Key = key
+				Knot.Value.Attr = attr
 			}
-			objStart = true
 		case xml.CharData:
-			if !objStart {
-				continue
-			}
 			val := transformer.StripSpaces(string(kind))
 			if len(val) > 0 {
-				if firstChild {
-					knot.Value.Worth = val
-					//knot = knot.AddToValueWithAttr(knot, parent, key, val, attr)
-				} else {
-					if arrCount > 0 {
-						//knot.SetToValue(knot, key, val)
-					} else {
-						//knot = knot.AddToNextWithAttr(knot, parent, key, val, attr)
-					}
-				}
+				Knot.Value.Worth = val
 			} else {
-				parent = knot
-				knot = knot.Value.Node
-				knot.Parent = parent
-				firstChild = true
+				Parent = Knot
+				Knot = Knot.AddToValue(Knot, node.Value{Node: &node.Node{Parent: Parent}})
 			}
 		case xml.EndElement:
-			objStart = false
-			if arrCount > 0 {
-				arrCount--
-			}
-			//parent = nil
-			if knot.Parent != nil {
-				knot = knot.Parent
-				parent = knot
-			}
+			Parent = Knot.Parent
+			isNext = true
 		}
 	}
 }

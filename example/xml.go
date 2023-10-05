@@ -7,11 +7,10 @@ import (
 )
 
 func runXml() {
-
 	byt, err := xml.ReadXml("example/files/valid.xml")
 	if err != nil {
 		log.Fatalln(err)
 	}
-	_, _ = xml.DecodeXml(byt)
-
+	knot, _ := xml.DecodeXml(byt)
+	knot.Print()
 }
