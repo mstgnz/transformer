@@ -3,7 +3,7 @@ package yml
 import (
 	"os"
 
-	"gitgub.com/mstgnz/transformer/node"
+	"github.com/mstgnz/transformer/node"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 )

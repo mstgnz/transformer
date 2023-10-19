@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode"
 
-	"gitgub.com/mstgnz/transformer/node"
 	"github.com/fatih/color"
+	"github.com/mstgnz/transformer/node"
 )
 
 // ErrorHandle

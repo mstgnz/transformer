@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"gitgub.com/mstgnz/transformer/json"
+	"github.com/mstgnz/transformer/json"
 )
 
 func runJson() {

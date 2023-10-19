@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"strings"
 
-	"gitgub.com/mstgnz/transformer/node"
+	"github.com/mstgnz/transformer/node"
 	"github.com/pkg/errors"
 )
 
