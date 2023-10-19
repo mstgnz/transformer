@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"gitgub.com/mstgnz/transformer/xml"
+	"github.com/mstgnz/transformer/xml"
 )
 
 func runXml() {

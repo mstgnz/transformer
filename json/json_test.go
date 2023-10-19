@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"gitgub.com/mstgnz/transformer/node"
+	"github.com/mstgnz/transformer/node"
 )
 
 func TestIsJSON(t *testing.T) {

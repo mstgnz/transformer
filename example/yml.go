@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"gitgub.com/mstgnz/transformer/yml"
+	"github.com/mstgnz/transformer/yml"
 )
 
 func runYml() {
