@@ -2,6 +2,7 @@ package yml
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/mstgnz/transformer/node"
@@ -12,14 +13,14 @@ func TestIsYml(t *testing.T) {
 		byt []byte
 	}
 	tests := []struct {
-		name string
 		args args
 		want bool
 	}{
 		// TODO: Add test cases.
+		{},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for i, tt := range tests {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			if got := IsYml(tt.args.byt); got != tt.want {
 				t.Errorf("IsYml() = %v, want %v", got, tt.want)
 			}
@@ -32,15 +33,15 @@ func TestNodeToYml(t *testing.T) {
 		node *node.Node
 	}
 	tests := []struct {
-		name    string
 		args    args
 		want    []byte
 		wantErr bool
 	}{
 		// TODO: Add test cases.
+		{},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for i, tt := range tests {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			got, err := NodeToYml(tt.args.node)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NodeToYml() error = %v, wantErr %v", err, tt.wantErr)
@@ -58,15 +59,15 @@ func TestYmlDecode(t *testing.T) {
 		byt []byte
 	}
 	tests := []struct {
-		name    string
 		args    args
 		want    *node.Node
 		wantErr bool
 	}{
 		// TODO: Add test cases.
+		{},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for i, tt := range tests {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			got, err := DecodeYml(tt.args.byt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DecodeYml() error = %v, wantErr %v", err, tt.wantErr)
@@ -84,15 +85,15 @@ func TestYmlRead(t *testing.T) {
 		filename string
 	}
 	tests := []struct {
-		name    string
 		args    args
 		want    []byte
 		wantErr bool
 	}{
 		// TODO: Add test cases.
+		{},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for i, tt := range tests {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			got, err := ReadYml(tt.args.filename)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadYml() error = %v, wantErr %v", err, tt.wantErr)
