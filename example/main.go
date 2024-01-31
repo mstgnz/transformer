@@ -5,8 +5,8 @@ func main() {
 	//runJson()
 
 	// Xml Node
-	//runXml()
+	runXml()
 
 	// Yaml Node
-	runYml()
+	//runYml()
 }

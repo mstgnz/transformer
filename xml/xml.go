@@ -121,3 +121,46 @@ func NodeToXml(knot *node.Node) (string, error) {
 
 	return xmlBuilder.String(), nil
 }
+
+// ParseXml relies only on key and value values. It ignores attribute values and duplicate keys in xml.
+func ParseXml(byt []byte) map[string]any {
+	key := ""
+	end := false
+	result := make(map[string]any)
+	step := result
+	parent := make([]map[string]any, 0)
+
+	dec := xml.NewDecoder(strings.NewReader(string(byt)))
+	for {
+		t, err := dec.Token()
+		if err == io.EOF || err != nil {
+			return result
+		}
+		if len(result) == 0 && reflect.TypeOf(t).Name() != "StartElement" {
+			continue
+		}
+		switch kind := t.(type) {
+		case xml.StartElement:
+			key = kind.Name.Local
+			step[key] = ""
+			end = false
+		case xml.CharData:
+			if !end {
+				val := transformer.StripSpaces(string(kind))
+				if len(val) > 0 {
+					step[key] = val
+				} else {
+					step[key] = make(map[string]any)
+					parent = append(parent, step)
+					step = step[key].(map[string]any)
+				}
+			}
+		case xml.EndElement:
+			count := len(parent)
+			if end && count > 0 {
+				step = parent[count-1]
+			}
+			end = true
+		}
+	}
+}
