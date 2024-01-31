@@ -12,7 +12,11 @@ func runXml() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	knot, _ := xml.DecodeXml(byt)
+
+	//knot, _ := xml.DecodeXml(byt)
 	//knot.Print()
-	fmt.Println(xml.NodeToXml(knot))
+	//fmt.Println(xml.NodeToXml(knot))
+
+	result := xml.ParseXml(byt)
+	fmt.Println(result)
 }
