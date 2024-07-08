@@ -190,7 +190,9 @@ func (n *Node) Print() {
 					}
 				}
 			}
-			level--
+			if level > 0 {
+				level--
+			}
 			node = node.Next
 		}
 	}
