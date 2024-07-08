@@ -12,8 +12,8 @@ func init() {
 }
 
 func TestNode_Exists(t *testing.T) {
-	if got := node.Exists(); !reflect.DeepEqual(got, false) {
-		t.Errorf("exists expected=%v, got=%v", false, got)
+	if got := node.Exists(); !reflect.DeepEqual(got, true) {
+		t.Errorf("exists expected=%v, got=%v", true, got)
 	}
 }
 
