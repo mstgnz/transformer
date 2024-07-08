@@ -87,7 +87,7 @@ func (n *Node) AddToValue(knot *Node, value Value) *Node {
 // It adds the Node comes with the parameter to the Next of the last Node of our Node.
 // nil control for knot coming with the parameter is not required as it will not cause an error.
 func (n *Node) AddToEnd(knot *Node) *Node {
-	if n == nil {
+	if n == nil || knot == nil {
 		return nil
 	}
 	iter := n
@@ -102,20 +102,31 @@ func (n *Node) AddToEnd(knot *Node) *Node {
 // Delete
 // If the Node to be deleted is root, root's next is assigned as the new root.
 func (n *Node) Delete(knot *Node) *Node {
-	if n == knot {
-		*n = *n.Next
+	if n == nil || knot == nil {
 		return n
 	}
-	// If the node to be deleted is in between or at the end, we move our iter object to the previous node of the node to be deleted.
-	for n.Next != nil && n.Next != knot {
-		*n = *n.Next
-	}
-	if n.Next != nil {
-		if n.Next.Next != nil {
-			n.Next = n.Next.Next
-			n.Next.Prev = n
+
+	if n == knot {
+		if n.Next != nil {
+			n = n.Next
+			n.Prev = nil
 		} else {
-			n.Next = nil
+			n = &Node{}
+		}
+		return n
+	}
+
+	iter := n
+	for iter != nil && iter.Next != knot {
+		iter = iter.Next
+	}
+
+	if iter != nil && iter.Next == knot {
+		if iter.Next.Next != nil {
+			iter.Next = iter.Next.Next
+			iter.Next.Prev = iter
+		} else {
+			iter.Next = nil
 		}
 	}
 	return n

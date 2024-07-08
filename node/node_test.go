@@ -7,6 +7,10 @@ import (
 
 var node *Node
 
+func init() {
+	node = &Node{}
+}
+
 func TestNode_Exists(t *testing.T) {
 	if got := node.Exists(); !reflect.DeepEqual(got, false) {
 		t.Errorf("exists expected=%v, got=%v", false, got)
