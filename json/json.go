@@ -8,15 +8,13 @@ import (
 	"log"
 	"os"
 	"reflect"
-	"strings"
 
 	"github.com/mstgnz/transformer/node"
 	"github.com/pkg/errors"
 )
 
 var (
-	Knot   *node.Node
-	Parent *node.Node
+	Knot *node.Node
 
 	key      string
 	objStart bool
@@ -46,7 +44,7 @@ func ReadJson(filename string) ([]byte, error) {
 // DecodeJson
 // Converts a byte slice to a `node.Node` structure.
 func DecodeJson(data []byte) (*node.Node, error) {
-	dec := json.NewDecoder(strings.NewReader(string(data)))
+	dec := json.NewDecoder(bytes.NewReader(data))
 	for {
 		token, err := dec.Token()
 		if err == io.EOF || err != nil {
@@ -56,109 +54,94 @@ func DecodeJson(data []byte) (*node.Node, error) {
 		value := fmt.Sprintf("%v", token)
 		// If the type of the object is json.Delim
 		if reflect.TypeOf(token).String() == "json.Delim" {
-			jsonDelim(token, value)
+			jsonDelim(value)
 		} else {
-			nonJsonDelim(token, value)
+			nonJsonDelim(value)
 		}
 	}
 }
 
 // jsonDelim
-func jsonDelim(token json.Token, value string) {
-	// If no Node has been created yet, don't enter here, skip JSON start -> {
+func jsonDelim(value string) {
 	if !Knot.Exists() {
+		objStart = true
+		Knot = &node.Node{}
 		return
 	}
-	// If the value of object token is a JSON object or array
 	switch value {
 	case "{": // set open object - {
-		// If the key is not empty; this is an object. A new Node will be added next to the existing Node, and the newly added Node will return.
-		// If the key is empty; There is an array object, and the Node will be created in the array and the newly added Node will be returned.
 		if arrStart && len(key) == 0 {
-			// An object only starts without a key in an array.
-			Knot = Knot.AddToValue(Knot, node.Value{Node: &node.Node{Prev: Knot}})
+			sub := &node.Node{}
+			Knot.Value.Array = append(Knot.Value.Array, &node.Value{Node: sub})
+			sub.Parent = Knot
+			Knot = sub
 		} else {
-			Knot = Knot.AddToNext(Knot, Parent, key)
+			sub := &node.Node{}
+			Knot.Next = &node.Node{Key: key, Value: &node.Value{Node: sub}, Prev: Knot, Parent: Knot.Parent}
+			sub.Parent = Knot.Next
+			Knot = sub
 		}
-		Parent = Knot
 		objStart = true
 		arrStart = false
 		key = ""
 	case "[": // set open array - [
-		// If the key is not null and objStart is true; The initial value of the Node will be set.
-		// If the key is not empty and objStart is false; A new Node will be created next to the Node.
-		// If the key is empty; this is a nested array object. will be added directly to the current Node's array.
 		if len(key) > 0 {
-			// If objStart is true, then the initial value of the Node is set.
 			if objStart {
-				Knot = Knot.AddToValue(Knot, node.Value{Array: []node.Value{}})
+				Knot.Key = key
+				Knot.Value = &node.Value{Array: []*node.Value{}}
 			} else {
-				// If objStart is false, a new Node is created next to the current Node.
-				Knot = Knot.AddToNext(Knot, Parent, key)
+				Knot.Next = &node.Node{Key: key, Value: &node.Value{}, Parent: Knot.Parent, Prev: Knot}
+				Knot = Knot.Next
 			}
-			Parent = Knot
 			arrStart = true
 			objStart = false
 			arrCount++
 			key = ""
-		} else {
-			// If there is no key, it is a nested array.
-			_ = append(Knot.Value.Array, node.Value{Worth: value})
 		}
 	case "]": // set close array
-		arrCount--
 		arrStart = false
+		if arrCount > 0 {
+			arrCount--
+		}
 	case "}": // set close object and set parent Node
-		Parent = nil
-		// if the parent is not empty
+		objStart = false
+		if arrCount > 0 {
+			arrStart = true
+		}
 		if Knot.Parent != nil {
-			// if there is an unclosed array and there is no key
-			if arrCount > 0 && len(Knot.Key) == 0 {
-				arrStart = true
-			}
-			// use parent as a node
 			Knot = Knot.Parent
-			// assign the parent of the node as parent, it can be nil or node
-			Parent = Knot.Parent
 		}
 	default: // shouldn't go here
-		log.Println("default not set -> ", token)
+		log.Println("default not set")
 	}
 }
 
 // nonJsonDelim
-func nonJsonDelim(_ json.Token, value string) {
-	// If the loop object is not a json.Delim, the key and value fields will be set.
-	// Since the JSON object is a key-value pair, first the key will be set and then the value will be set.
+func nonJsonDelim(value string) {
 	if len(key) == 0 {
-		// If an array object is open, this key-value is essentially an array object.
-		// If the array is not empty
 		if arrStart {
-			_ = append(Knot.Value.Array, node.Value{Worth: value})
+			Knot.Value.Array = append(Knot.Value.Array, &node.Value{Worth: value})
 		} else {
 			key = value
 		}
 	} else {
-		// If objStart is true, then the initial value of the Node is set.
 		if objStart {
-			Knot = Knot.AddToValue(Knot, node.Value{Worth: value})
+			Knot.Key = key
+			Knot.Value = &node.Value{Worth: value}
 		} else {
-			Knot = Knot.AddToNext(Knot, Parent, key)
+			Knot.Next = &node.Node{Key: key, Parent: Knot.Parent, Prev: Knot}
+			Knot.Next.Value = &node.Value{Worth: value}
+			Knot = Knot.Next
 		}
-		// Here objStart and key values are reset.
 		objStart = false
 		key = ""
 	}
 }
 
 // NodeToJson
-// TODO test
 func NodeToJson(node *node.Node) ([]byte, error) {
-	var (
-		buf bytes.Buffer
-		enc *json.Encoder
-	)
-	enc = json.NewEncoder(&buf)
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
 	enc.SetIndent("  ", "  ")
 	err := enc.Encode(node)
 	if err != nil {

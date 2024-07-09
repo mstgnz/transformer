@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/mstgnz/transformer/json"
@@ -16,6 +15,8 @@ func runJson() {
 	knot, _ := json.DecodeJson(byt)
 	knot = knot.Reset()
 
-	fmt.Println(knot.Next.Next.Value)
-	//fmt.Println(knot.GetNode(nil, "test")[0].Value)
+	knot.Print()
+
+	log.Println()
+
 }
