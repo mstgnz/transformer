@@ -14,7 +14,7 @@ import (
 // This Node structure accommodates 3 file types, allows you to do the necessary manipulations and outputs the file type you want.
 type Node struct {
 	Key    string
-	Value  Value
+	Value  *Value
 	Next   *Node
 	Prev   *Node
 	Parent *Node
@@ -25,7 +25,7 @@ type Node struct {
 // For each Node, only one of the values of the Value structure can be set (should be)
 type Value struct {
 	Node  *Node
-	Array []Value
+	Array []*Value
 	Worth string
 	Attr  map[string]string // for xml
 }
@@ -38,9 +38,9 @@ func (n *Node) AddToStart(knot *Node) *Node {
 	if knot == nil {
 		return nil
 	}
-	temp := *n
-	*n = *knot
-	n.Next = &temp
+	temp := n
+	n = knot
+	n.Next = temp
 	n.Next.Prev = n
 	if n.Next.Next != nil {
 		n.Next.Next.Prev = n.Next
@@ -54,6 +54,9 @@ func (n *Node) AddToStart(knot *Node) *Node {
 // The Parent comes as a parameter is the Parent of the Node to be created.
 // The nil control for the knot that comes as a parameter is only for the health of the flow.
 func (n *Node) AddToNext(knot *Node, parent *Node, key string) *Node {
+	if parent != nil {
+		parent = parent.Parent
+	}
 	if knot == nil {
 		return &Node{Key: key, Prev: knot, Parent: parent}
 	}
@@ -66,12 +69,14 @@ func (n *Node) AddToNext(knot *Node, parent *Node, key string) *Node {
 // If the Node in the given Value structure is not empty, it returns this Node.
 // If the Array in the given Value structure is not empty and the last element of the Array is a Node and not nil, return this Node.
 // The nil control for the Node that comes with the parameter is necessary for flow health. Node usage should be implemented accordingly.
-func (n *Node) AddToValue(knot *Node, value Value) *Node {
+func (n *Node) AddToValue(knot *Node, value *Value) *Node {
 	if knot == nil {
 		return nil
 	}
+	parent := knot
 	knot.Value = value
 	if knot.Value.Node != nil {
+		knot.Value.Node.Parent = parent
 		return knot.Value.Node
 	}
 	if size := len(knot.Value.Array); size > 0 {
@@ -172,7 +177,7 @@ func (n *Node) Print() {
 			node.print(node, level)
 
 			// if Node Value.Node exists
-			if node.Value.Node != nil {
+			if node.Value != nil && node.Value.Node != nil {
 				if len(node.Key) == 0 {
 					node.Key = "array"
 				}
@@ -181,7 +186,7 @@ func (n *Node) Print() {
 			}
 
 			// if Node Value.Array exists
-			if len(node.Value.Array) > 0 {
+			if node.Value != nil && len(node.Value.Array) > 0 {
 				for _, slc := range node.Value.Array {
 					// if Array.Value.Node exists
 					if slc.Node != nil {
@@ -190,7 +195,7 @@ func (n *Node) Print() {
 					}
 				}
 			}
-			if level > 0 {
+			if node.Next == nil && node.Parent != nil {
 				level--
 			}
 			node = node.Next

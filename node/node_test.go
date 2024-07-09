@@ -34,9 +34,9 @@ func TestNode_AddToStart(t *testing.T) {
 
 func TestNode_AddToNext(t *testing.T) {
 	node = node.AddToNext(node, nil, "first")
-	node = node.AddToValue(node, Value{Worth: "first value"})
+	node = node.AddToValue(node, &Value{Worth: "first value"})
 	node = node.AddToNext(node, nil, "second")
-	node = node.AddToValue(node, Value{Worth: "second value"})
+	node = node.AddToValue(node, &Value{Worth: "second value"})
 	if got := node.Key; !reflect.DeepEqual(got, "second") {
 		t.Errorf("key expected=%v, got=%v", "second", got)
 	}
@@ -60,7 +60,7 @@ func TestNode_AddToNext(t *testing.T) {
 func TestNode_AddToValue(t *testing.T) {
 	// test value worth
 	node = node.AddToNext(node, nil, "third")
-	node = node.AddToValue(node, Value{Worth: "third value"})
+	node = node.AddToValue(node, &Value{Worth: "third value"})
 	if got := node.Key; !reflect.DeepEqual(got, "third") {
 		t.Errorf("key expected=%v, got=%v", "third", got)
 	}
@@ -68,23 +68,23 @@ func TestNode_AddToValue(t *testing.T) {
 		t.Errorf("key expected=%v, got=%v", "third value", got)
 	}
 	// test value node
-	node = node.AddToValue(node, Value{Node: &Node{Key: "value node"}})
+	node = node.AddToValue(node, &Value{Node: &Node{Key: "value node"}})
 	if got := node.Key; !reflect.DeepEqual(got, "value node") {
 		t.Errorf("key expected=%v, got=%v", "value node", got)
 	}
 	// test value map
 	attr := map[string]string{"xml": "value"}
-	node = node.AddToValue(node, Value{Attr: attr})
+	node = node.AddToValue(node, &Value{Attr: attr})
 	if got := node.Value.Attr; !reflect.DeepEqual(got, attr) {
 		t.Errorf("key expected=%v, got=%v", attr, got)
 	}
 	// test array
 	attr = map[string]string{"slc": "value"}
-	node = node.AddToValue(node, Value{
-		Array: []Value{
+	node = node.AddToValue(node, &Value{
+		Array: []*Value{
 			{Worth: "slc value"},
 			{Attr: attr},
-			{Array: []Value{{}, {Worth: "middle"}, {}}},
+			{Array: []*Value{{}, {Worth: "middle"}, {}}},
 		},
 	})
 	if got := node.Value.Array[0].Worth; !reflect.DeepEqual(got, "slc value") {
@@ -97,8 +97,8 @@ func TestNode_AddToValue(t *testing.T) {
 		t.Errorf("key expected=%v, got=%v", "middle", got)
 	}
 	// test array with node
-	node = node.AddToValue(node, Value{
-		Array: []Value{
+	node = node.AddToValue(node, &Value{
+		Array: []*Value{
 			{Node: &Node{Key: "slc node key"}},
 		},
 	})
@@ -137,11 +137,11 @@ func TestNode_Delete(t *testing.T) {
 
 func TestNode_GetNode(t *testing.T) {
 	node = node.AddToNext(node, nil, "first")
-	node = node.AddToValue(node, Value{Worth: "first value"})
+	node = node.AddToValue(node, &Value{Worth: "first value"})
 	node = node.AddToNext(node, nil, "second")
-	node = node.AddToValue(node, Value{Worth: "second value"})
+	node = node.AddToValue(node, &Value{Worth: "second value"})
 	node = node.AddToNext(node, nil, "third")
-	node = node.AddToValue(node, Value{Worth: "third value"})
+	node = node.AddToValue(node, &Value{Worth: "third value"})
 	nodes := node.GetNode("second")
 	if got := nodes[0].Key; !reflect.DeepEqual(got, "second") {
 		t.Errorf("key expected=%v, got=%v", "second", got)
