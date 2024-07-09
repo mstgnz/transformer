@@ -13,6 +13,12 @@ The third way is to write our own key-value structure and design it to be sequen
 
 This transformer gives us the 3rd path.
 
+### Features
+- [ ] Json to Node
+- [x] Yaml to Node
+- [ ] Xml to Node
+
+
 ### What will this process bring us?
 
 Our structure will hold the next, previous and parent objects along with the key/value. In this way, we will have the opportunity to move on the struct. We can also customize this struct as we want by adding the methods we want.
