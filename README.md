@@ -15,8 +15,8 @@ This transformer gives us the 3rd path.
 
 ### Features
 - [ ] Json to Node
-- [x] Yaml to Node
-- [ ] Xml to Node
+- [ ] Yaml to Node
+- [x] Xml to Node
 
 
 ### What will this process bring us?
