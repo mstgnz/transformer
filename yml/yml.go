@@ -54,7 +54,7 @@ func DecodeYml(data []byte) (*node.Node, error) {
 				Knot = Knot.AddToNext(Knot, Parent, child.Value)
 			} else {
 				if child.Kind == yaml.MappingNode {
-					Knot = Knot.AddToValue(Knot, node.Value{})
+					Knot = Knot.AddToValue(Knot, &node.Value{})
 				} else {
 					Knot.Value.Worth = child.Value
 				}
