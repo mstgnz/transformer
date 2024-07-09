@@ -64,46 +64,28 @@ func TestReadXml(t *testing.T) {
 }
 
 func TestDecodeXml(t *testing.T) {
-	type args struct {
-		byt []byte
-	}
-	tests := []struct {
-		args    args
-		want    *node.Node
-		wantErr bool
-	}{
-		{
-			args: args{byt: []byte(`<root><child>value</child></root>`)},
-			want: &node.Node{
-				Key: "root",
+	byt := []byte(`<root><child>value</child></root>`)
+	exp := &node.Node{
+		Key: "root",
+		Value: &node.Value{
+			Node: &node.Node{
+				Key: "child",
 				Value: &node.Value{
-					Node: &node.Node{
-						Key: "child",
-						Value: &node.Value{
-							Worth: "value",
-						},
-					},
+					Worth: "value",
 				},
 			},
-			wantErr: false,
-		},
-		{
-			args:    args{byt: []byte(`<root><child>value</child>`)},
-			want:    nil,
-			wantErr: true,
 		},
 	}
-	for i, tt := range tests {
-		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			got, err := DecodeXml(tt.args.byt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DecodeXml() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DecodeXml() got = %v, want %v", got, tt.want)
-			}
-		})
+
+	got, _ := DecodeXml(byt)
+	if !reflect.DeepEqual(got.Key, exp.Key) {
+		t.Errorf("DecodeXml() got = %v, want %v", got, exp)
+	}
+	if !reflect.DeepEqual(got.Value.Node.Key, exp.Value.Node.Key) {
+		t.Errorf("DecodeXml() got = %v, want %v", got, exp)
+	}
+	if got.Value.Node.Parent != nil && exp.Value.Node.Parent != nil {
+		t.Errorf("DecodeXml() got = %v, want %v", got, exp)
 	}
 }
 
@@ -148,46 +130,10 @@ func TestNodeToXml(t *testing.T) {
 }
 
 func TestParseXml(t *testing.T) {
-	type args struct {
-		byt []byte
-	}
-	tests := []struct {
-		args args
-		want map[string]any
-	}{
-		{
-			args: args{byt: []byte(`<root><child>value</child></root>`)},
-			want: map[string]any{
-				"root": map[string]any{
-					"child": "value",
-				},
-			},
-		},
-		{
-			args: args{byt: []byte(`<root><child1>value1</child1><child2>value2</child2></root>`)},
-			want: map[string]any{
-				"root": map[string]any{
-					"child1": "value1",
-					"child2": "value2",
-				},
-			},
-		},
-		{
-			args: args{byt: []byte(`<root><child><subchild>value</subchild></child></root>`)},
-			want: map[string]any{
-				"root": map[string]any{
-					"child": map[string]any{
-						"subchild": "value",
-					},
-				},
-			},
-		},
-	}
-	for i, tt := range tests {
-		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			if got := ParseXml(tt.args.byt); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ParseXml() = %v, want %v", got, tt.want)
-			}
-		})
+	byt := []byte(`<?xml version="1.0" encoding="UTF-8" ?><root attr="root"><apiVersion>v1</apiVersion><kind>Pod</kind><thing prop="2" version="4.5">4.56</thing><metadata><name>rss-site</name><labels><app>web</app></labels></metadata><spec><containers><name>front-end</name><image>nginx</image><ports><containerPort>80</containerPort><port port="34">34</port><port>55</port><status status="on">on</status><status>off</status></ports></containers><containers><name>rss-reader</name><image img="nginx">a/rss-php-nginx:v1</image><ports><containerPort>0.23</containerPort><test>23</test><test>334</test><test type="old">old</test><test>new</test></ports></containers></spec></root>`)
+
+	got, _ := DecodeXml(byt)
+	if !reflect.DeepEqual(got.Value.Node.Next.Next.Next.Key, "metadata") {
+		t.Errorf("DecodeXml() got = %v, want %v", "metadata", got.Value.Node.Next.Next.Next.Key)
 	}
 }

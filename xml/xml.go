@@ -35,7 +35,6 @@ func ReadXml(filename string) ([]byte, error) {
 // DecodeXml
 // Converts a byte array to a key value struct.
 func DecodeXml(byt []byte) (*node.Node, error) {
-
 	dec := xml.NewDecoder(strings.NewReader(string(byt)))
 
 	var Knot *node.Node
@@ -45,7 +44,7 @@ func DecodeXml(byt []byte) (*node.Node, error) {
 	for {
 		t, err := dec.Token()
 		if err == io.EOF || err != nil {
-			return Knot, errors.Wrap(err, "no more")
+			return Knot, err
 		}
 		if Knot == nil && reflect.TypeOf(t).Name() != "StartElement" {
 			continue
@@ -68,7 +67,7 @@ func DecodeXml(byt []byte) (*node.Node, error) {
 				isNext = false
 			} else {
 				if start {
-					Knot.Value.Node = &node.Node{Key: key, Parent: Knot, Value: &node.Value{}}
+					Knot.Value.Node = &node.Node{Key: key, Parent: Knot, Value: &node.Value{Attr: attr}}
 					Knot = Knot.Value.Node
 				} else {
 					Knot.Key = key
