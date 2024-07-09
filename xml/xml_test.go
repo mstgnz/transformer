@@ -1,6 +1,7 @@
 package xml
 
 import (
+	"os"
 	"reflect"
 	"strconv"
 	"testing"
@@ -16,8 +17,8 @@ func TestIsXml(t *testing.T) {
 		args args
 		want bool
 	}{
-		// TODO: Add test cases.
-		{},
+		{args: args{byt: []byte(`<root><child>value</child></root>`)}, want: true},
+		{args: args{byt: []byte(`<root><child>value</child>`)}, want: false},
 	}
 	for i, tt := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
@@ -28,33 +29,41 @@ func TestIsXml(t *testing.T) {
 	}
 }
 
-func TestNodeToXml(t *testing.T) {
+func TestReadXml(t *testing.T) {
+	filename := "test.xml"
+	expectedContent := `<root><child>value</child></root>`
+	err := os.WriteFile(filename, []byte(expectedContent), 0644)
+	if err != nil {
+		t.Fatalf("Error writing test file: %v", err)
+	}
+	defer os.Remove(filename)
+
 	type args struct {
-		node *node.Node
+		filename string
 	}
 	tests := []struct {
 		args    args
 		want    []byte
 		wantErr bool
 	}{
-		// TODO: Add test cases.
-		{},
+		{args: args{filename: filename}, want: []byte(expectedContent), wantErr: false},
+		{args: args{filename: "nonexistent.xml"}, want: nil, wantErr: true},
 	}
 	for i, tt := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			got, err := NodeToXml(tt.args.node)
+			got, err := ReadXml(tt.args.filename)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NodeToXml() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ReadXml() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NodeToXml() got = %v, want %v", got, tt.want)
+				t.Errorf("ReadXml() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestXmlDecode(t *testing.T) {
+func TestDecodeXml(t *testing.T) {
 	type args struct {
 		byt []byte
 	}
@@ -63,8 +72,26 @@ func TestXmlDecode(t *testing.T) {
 		want    *node.Node
 		wantErr bool
 	}{
-		// TODO: Add test cases.
-		{},
+		{
+			args: args{byt: []byte(`<root><child>value</child></root>`)},
+			want: &node.Node{
+				Key: "root",
+				Value: &node.Value{
+					Node: &node.Node{
+						Key: "child",
+						Value: &node.Value{
+							Worth: "value",
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			args:    args{byt: []byte(`<root><child>value</child>`)},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	for i, tt := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
@@ -80,27 +107,86 @@ func TestXmlDecode(t *testing.T) {
 	}
 }
 
-func TestXmlRead(t *testing.T) {
+func TestNodeToXml(t *testing.T) {
 	type args struct {
-		filename string
+		node *node.Node
 	}
 	tests := []struct {
 		args    args
-		want    []byte
+		want    string
 		wantErr bool
 	}{
-		// TODO: Add test cases.
-		{},
+		{
+			args: args{node: &node.Node{
+				Key: "root",
+				Value: &node.Value{
+					Node: &node.Node{
+						Key: "child",
+						Value: &node.Value{
+							Worth: "value",
+						},
+					},
+				},
+			}},
+			want:    `<?xml version="1.0" encoding="UTF-8" ?><root><child>value</child></root>`,
+			wantErr: false,
+		},
+		// Add more test cases as needed
 	}
 	for i, tt := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			got, err := ReadXml(tt.args.filename)
+			got, err := NodeToXml(tt.args.node)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadXml() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NodeToXml() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ReadXml() got = %v, want %v", got, tt.want)
+				t.Errorf("NodeToXml() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseXml(t *testing.T) {
+	type args struct {
+		byt []byte
+	}
+	tests := []struct {
+		args args
+		want map[string]any
+	}{
+		{
+			args: args{byt: []byte(`<root><child>value</child></root>`)},
+			want: map[string]any{
+				"root": map[string]any{
+					"child": "value",
+				},
+			},
+		},
+		{
+			args: args{byt: []byte(`<root><child1>value1</child1><child2>value2</child2></root>`)},
+			want: map[string]any{
+				"root": map[string]any{
+					"child1": "value1",
+					"child2": "value2",
+				},
+			},
+		},
+		{
+			args: args{byt: []byte(`<root><child><subchild>value</subchild></child></root>`)},
+			want: map[string]any{
+				"root": map[string]any{
+					"child": map[string]any{
+						"subchild": "value",
+					},
+				},
+			},
+		},
+	}
+	for i, tt := range tests {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			if got := ParseXml(tt.args.byt); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseXml() = %v, want %v", got, tt.want)
 			}
 		})
 	}

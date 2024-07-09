@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/mstgnz/transformer/xml"
@@ -13,10 +12,20 @@ func runXml() {
 		log.Fatalln(err)
 	}
 
-	//knot, _ := xml.DecodeXml(byt)
-	//knot.Print()
-	//fmt.Println(xml.NodeToXml(knot))
+	// xml to node
+	knot, _ := xml.DecodeXml(byt)
+	knot.Reset()
+	knot.Print()
 
-	result := xml.ParseXml(byt)
-	fmt.Println(result)
+	log.Println()
+
+	// node to xml
+	if str, err := xml.NodeToXml(knot); err != nil {
+		log.Println("NodeToXml Err: ", err)
+	} else {
+		log.Println(str)
+	}
+
+	//result := xml.ParseXml(byt)
+	//log.Println(result)
 }

@@ -16,7 +16,7 @@ import (
 // IsXml
 // Checks if the given file is in xml format.
 func IsXml(byt []byte) bool {
-	return xml.Unmarshal(byt, new(interface{})) == nil
+	return xml.Unmarshal(byt, new(any)) == nil
 }
 
 // ReadXml
@@ -38,9 +38,9 @@ func DecodeXml(byt []byte) (*node.Node, error) {
 
 	dec := xml.NewDecoder(strings.NewReader(string(byt)))
 
-	var Parent *node.Node
 	var Knot *node.Node
-	isNext := true
+	isNext := false
+	start := false
 
 	for {
 		t, err := dec.Token()
@@ -53,6 +53,9 @@ func DecodeXml(byt []byte) (*node.Node, error) {
 
 		switch kind := t.(type) {
 		case xml.StartElement:
+			if Knot == nil {
+				Knot = &node.Node{Value: &node.Value{}}
+			}
 			key := kind.Name.Local
 			// Attr
 			attr := map[string]string{}
@@ -60,25 +63,30 @@ func DecodeXml(byt []byte) (*node.Node, error) {
 				attr[a.Name.Local] = a.Value
 			}
 			if isNext {
-				Knot = Knot.AddToNext(Knot, Parent, key)
-				Knot.Value.Attr = attr
+				Knot.Next = &node.Node{Key: key, Parent: Knot.Parent, Prev: Knot, Value: &node.Value{Attr: attr}}
+				Knot = Knot.Next
 				isNext = false
 			} else {
-				Knot.Key = key
-				Knot.Value.Attr = attr
+				if start {
+					Knot.Value.Node = &node.Node{Key: key, Parent: Knot, Value: &node.Value{}}
+					Knot = Knot.Value.Node
+				} else {
+					Knot.Key = key
+					Knot.Value.Attr = attr
+				}
 			}
+			start = true
 		case xml.CharData:
 			val := transformer.StripSpaces(string(kind))
 			if len(val) > 0 {
 				Knot.Value.Worth = val
-			} else {
-				Parent = Knot
-				Knot.Value.Node = &node.Node{Parent: Parent}
-				Knot = Knot.AddToValue(Knot, Knot.Value)
 			}
 		case xml.EndElement:
-			Parent = Knot.Parent
+			if Knot.Parent != nil && isNext {
+				Knot = Knot.Parent
+			}
 			isNext = true
+			start = false
 		}
 	}
 }
@@ -88,36 +96,43 @@ func DecodeXml(byt []byte) (*node.Node, error) {
 func NodeToXml(knot *node.Node) (string, error) {
 	var xmlBuilder strings.Builder
 	xmlBuilder.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>")
+
 	var generate func(node *node.Node)
 	generate = func(node *node.Node) {
 		for node != nil {
 			if len(node.Key) > 0 {
+				// Write start tag with attributes
 				var attrBuilder strings.Builder
 				for k, v := range node.Value.Attr {
 					attrBuilder.WriteString(fmt.Sprintf(" %v=\"%v\"", k, v))
 				}
-				xmlBuilder.WriteString(fmt.Sprintf("<%v%v>%v</%v>", node.Key, attrBuilder.String(), node.Value.Worth, node.Key))
-			}
-			// if Node Value.Node exists
-			if node.Value.Node != nil {
-				if len(node.Key) == 0 {
-					node.Key = "array"
+				xmlBuilder.WriteString(fmt.Sprintf("<%v%v>", node.Key, attrBuilder.String()))
+
+				// Write value if any
+				if len(node.Value.Worth) > 0 {
+					xmlBuilder.WriteString(node.Value.Worth)
 				}
-				generate(node.Value.Node)
-			}
-			// if Node Value.Array exists
-			if len(node.Value.Array) > 0 {
-				for _, slc := range node.Value.Array {
-					// if Array.Value.Node exists
-					if slc.Node != nil {
-						generate(slc.Node)
+
+				// Process nested Node
+				if node.Value.Node != nil {
+					generate(node.Value.Node)
+				}
+
+				// Process nested Array
+				if len(node.Value.Array) > 0 {
+					for _, arrayNode := range node.Value.Array {
+						if arrayNode.Node != nil {
+							generate(arrayNode.Node)
+						}
 					}
 				}
+				// Write end tag
+				xmlBuilder.WriteString(fmt.Sprintf("</%v>", node.Key))
 			}
 			node = node.Next
 		}
 	}
-	generate(knot.Reset())
+	generate(knot)
 
 	return xmlBuilder.String(), nil
 }
@@ -159,6 +174,7 @@ func ParseXml(byt []byte) map[string]any {
 			count := len(parent)
 			if end && count > 0 {
 				step = parent[count-1]
+				parent = parent[:count-1]
 			}
 			end = true
 		}
