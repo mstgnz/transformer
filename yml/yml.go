@@ -32,7 +32,6 @@ func ReadYml(filename string) ([]byte, error) {
 func DecodeYml(data []byte) (*node.Node, error) {
 	var (
 		Knot   *node.Node
-		Parent *node.Node
 		dec    yaml.Node
 		parser func(node *yaml.Node)
 	)
@@ -43,6 +42,8 @@ func DecodeYml(data []byte) (*node.Node, error) {
 		return Knot, err
 	}
 
+	Knot = &node.Node{Value: &node.Value{}}
+
 	// recursive
 	parser = func(yam *yaml.Node) {
 		indent := 0
@@ -51,17 +52,19 @@ func DecodeYml(data []byte) (*node.Node, error) {
 			// mod 2 = Key
 			if k%2 == 0 {
 				indent = child.Column - 1
-				Knot = Knot.AddToNext(Knot, Parent, child.Value)
+				Knot.Key = child.Value
 			} else {
 				if child.Kind == yaml.MappingNode {
-					Knot = Knot.AddToValue(Knot, &node.Value{})
+					Knot.Next = &node.Node{Key: child.Value, Parent: Knot.Parent, Prev: Knot, Value: &node.Value{}}
+					Knot = Knot.Next
 				} else {
 					Knot.Value.Worth = child.Value
 				}
 			}
 			if current > indent {
-				// end objet
-				Parent = Knot.Parent
+				if Knot.Parent != nil {
+					Knot = Knot.Parent
+				}
 			}
 			parser(child)
 		}

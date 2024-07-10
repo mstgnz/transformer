@@ -1,0 +1,30 @@
+apiVersion: apps/v1                 - 1.Node, 1.Node.Key=apiVersion, 1.Node.Value.Worth=apps/v1, 1.Node.Next=2.Node, 1.Node.Parent=nil
+kind: Deployment                    - 2.Node, 2.Node.Next=3.Node, 2.Node.Prev=1.Node, 2.Node.Parent=1.Node.Parent
+metadata:                           - 3.Node, 3.Node.Next=5.Node, 3.Node.Prev=2.Node, 3.Node.Parent=2.Node.Parent, 3.Node.Value.Node=4.Node
+  name: front-end                   - 4.Node, 4.Node.Next=nil, 4.Node.Prev=nil, 4.Node.Parent=3.Node
+spec:                               - 5.Node, 5.Node.Next=30.Node, 5.Node.Prev=3.Node, 5.Node.Parent=3.Node.Parent, 5.Node.Value.Node=6.Node
+  replicas: 1                       - 6.Node, 6.Node.Next=7.Node, 6.Node.Prev=nil, 6.Node.Parent=5.Node, 6.Node.Key=replicas, 6.Node.Value.Worth=1
+  selector:                         - 7.Node, 7.Node.Next=10.Node, 7.Node.Prev=6.Node, 7.Node.Parent=6.Node.Parent
+    matchLabels:                    - 8.Node, 8.Node.Next=nil, 8.Node.Prev=nil, 8.Node.Parent=7.Node
+      app: front-end                - 9.Node, 9.Node.Next=nil, 9.Node.Prev=nil, 9.Node.Parent=8.Node
+  template:                         - 10.Node, 10.Node.Next=nil, 10.Node.Prev=7.Node, 10.Node.Parent=7.Node.Parent, 10.Node.Value.Node=11.Node
+    metadata:                       - 11.Node, 11.Node.Next=14.Node, 11.Node.Prev=nil, 11.Node.Parent=10.Node
+      labels:                       - 12.Node, 12.Node.Next=nil, 12.Node.Prev=nil, 12.Node.Parent=11.Node
+        app: front-end              - 13.Node, 13.Node.Next=nil, 13.Node.Prev=nil, 13.Node.Parent=12.Node
+    spec:                           - 14.Node, 14.Node.Next=nil, 14.Node.Prev=11.Node, 14.Node.Parent=11.Node.Parent, 14.Node.Value.Node=15.Node
+      containers:                   - 15.Node, 15.Node.Next=nil, 15.Node.Prev=nil, 15.Node.Parent=14.Node
+        - name: front-end           - 16.Node, 16.Node.Next=nil, 16.Node.Prev=nil, 16.Node.Parent=15.Node
+          image: "front-end:1.0.1"  - 17.Node, 17.Node.Next=18.Node, 17.Node.Prev=16.Node, 17.Node.Parent=16.Node.Parent
+          resources:                - 18.Node, 18.Node.Next=25.Node, 18.Node.Prev=17.Node, 18.Node.Parent=17.Node.Parent
+            requests:               - 19.Node, 19.Node.Next=22.Node, 19.Node.Prev=nil, 19.Node.Parent=18.Node
+              memory: "64Mi"        - 20.Node, 20.Node.Next=21.Node, 20.Node.Prev=nil, 20.Node.Parent=19.Node
+              cpu: "250m"           - 21.Node, 21.Node.Next=nil, 21.Node.Prev=20.Node, 21.Node.Parent=20.Node.Parent
+            limits:                 - 22.Node, 22.Node.Next=nil, 22.Node.Prev=19.Node, 22.Node.Parent=19.Node.Parent
+              memory: "128Mi"       - 23.Node, 23.Node.Next=24.Node, 23.Node.Prev=nil, 23.Node.Parent=22.Node
+              cpu: "500m"           - 24.Node, 24.Node.Next=nil, 24.Node.Prev=23.Node, 24.Node.Parent=23.Node.Parent
+          env:                      - 25.Node, 25.Node.Next=28.Node, 25.Node.Prev=18.Node, 25.Node.Parent=18.Node.Parent
+            - name: BROKER_URL      - 26.Node, 26.Node.Next=27.Node, 26.Node.Prev=nil, 26.Node.Parent=25.Node
+              value: "https://a.co" - 27.Node, 27.Node.Next=nil, 27.Node.Prev=26.Node, 27.Node.Parent=26.Node.Parent
+          ports:                    - 28.Node, 28.Node.Next=nil, 28.Node.Prev=25.Node, 28.Node.Parent=25.Node.Parent, 28.Node.Value.Node=29.Node
+            - containerPort: 8081   - 29.Node, 29.Node.Next=nil, 29.Node.Prev=nil, 29.Node.Parent=28.Node
+array: ["abc",123,"def",456]        - 30.Node, 30.Node.Next=nil, 30.Node.Prev=5.Node, 30.Node.Parent=5.Node.Parent, 30.Node.Value.Array=["abc",123,"def",456]

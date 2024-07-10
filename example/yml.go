@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/mstgnz/transformer/yml"
@@ -13,11 +12,17 @@ func runYml() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
 	knot, _ := yml.DecodeYml(byt)
 	knot = knot.Reset()
-	for knot.Next != nil {
-		fmt.Println(knot.Key)
+
+	knot.Print()
+
+	log.Println()
+
+	/* for knot.Next != nil {
+		log.Println(knot.Key)
 		knot = knot.Next
-	}
+	} */
 
 }

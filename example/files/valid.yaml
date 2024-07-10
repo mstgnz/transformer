@@ -27,3 +27,4 @@ spec:
               value: "https://broker-service.info"
           ports:
             - containerPort: 8081
+test: ["abc", 123, "def", 456]
