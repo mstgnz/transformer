@@ -18,7 +18,7 @@ func runYml() {
 
 	knot.Print()
 
-	log.Println()
+	log.Println(knot.Parent)
 
 	/* for knot.Next != nil {
 		log.Println(knot.Key)

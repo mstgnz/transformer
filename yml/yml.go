@@ -1,6 +1,7 @@
 package yml
 
 import (
+	"log"
 	"os"
 
 	"github.com/mstgnz/transformer/node"
@@ -44,13 +45,16 @@ func DecodeYml(data []byte) (*node.Node, error) {
 
 	Knot = &node.Node{Value: &node.Value{}}
 
+	log.Println(yaml.DocumentNode, yaml.SequenceNode, yaml.MappingNode, yaml.ScalarNode, yaml.AliasNode)
+
 	// recursive
 	parser = func(yam *yaml.Node) {
-		indent := 0
-		current := 0
-		for k, child := range yam.Content {
+		//indent := 0
+		//current := 0
+		for _, child := range yam.Content {
+			log.Println(child.Kind, child.Line, child.Column, child.Tag, child.Value)
 			// mod 2 = Key
-			if k%2 == 0 {
+			/* if k%2 == 0 {
 				indent = child.Column - 1
 				Knot.Key = child.Value
 			} else {
@@ -65,7 +69,7 @@ func DecodeYml(data []byte) (*node.Node, error) {
 				if Knot.Parent != nil {
 					Knot = Knot.Parent
 				}
-			}
+			} */
 			parser(child)
 		}
 	}
