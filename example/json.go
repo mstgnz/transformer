@@ -1,22 +1,54 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
-	"github.com/mstgnz/transformer/json"
+	"github.com/mstgnz/transformer/tjson"
 )
 
-func runJson() {
-
-	byt, err := json.ReadJson("example/files/valid.json")
+// JsonExample demonstrates the usage of the tjson package
+func JsonExample() {
+	// Read JSON file
+	data, err := tjson.ReadJson("example/files/valid.json")
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
-	knot, _ := json.DecodeJson(byt)
-	knot = knot.Reset()
 
-	knot.Print()
+	// Check if it's valid JSON
+	if !tjson.IsJson(data) {
+		log.Fatal("Invalid JSON format")
+	}
 
-	log.Println()
+	// Decode JSON to Node structure
+	node, err := tjson.DecodeJson(data)
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	// Convert Node back to JSON
+	jsonData, err := tjson.NodeToJson(node)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Converted JSON:")
+	fmt.Println(string(jsonData))
+
+	// Read invalid JSON file
+	data, err = tjson.ReadJson("example/files/invalid.json")
+	if err != nil {
+		fmt.Printf("Error reading invalid JSON: %v\n", err)
+	}
+
+	// Check if it's valid JSON
+	if !tjson.IsJson(data) {
+		fmt.Println("Invalid JSON format detected")
+	}
+
+	// Try to decode invalid JSON
+	node, err = tjson.DecodeJson(data)
+	if err != nil {
+		fmt.Printf("Error decoding invalid JSON: %v\n", err)
+	}
 }

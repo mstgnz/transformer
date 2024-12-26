@@ -1,28 +1,54 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
-	"github.com/mstgnz/transformer/yml"
+	"github.com/mstgnz/transformer/tyaml"
 )
 
-func runYml() {
-
-	byt, err := yml.ReadYml("example/files/valid.yaml")
+// YmlExample demonstrates the usage of the tyaml package
+func YmlExample() {
+	// Read YAML file
+	data, err := tyaml.ReadYaml("example/files/valid.yaml")
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 
-	knot, _ := yml.DecodeYml(byt)
-	knot = knot.Reset()
+	// Check if it's valid YAML
+	if !tyaml.IsYaml(data) {
+		log.Fatal("Invalid YAML format")
+	}
 
-	knot.Print()
+	// Decode YAML to Node structure
+	node, err := tyaml.DecodeYaml(data)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	log.Println(knot.Parent)
+	// Convert Node back to YAML
+	yamlData, err := tyaml.NodeToYaml(node)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	/* for knot.Next != nil {
-		log.Println(knot.Key)
-		knot = knot.Next
-	} */
+	fmt.Println("Converted YAML:")
+	fmt.Println(string(yamlData))
 
+	// Read invalid YAML file
+	data, err = tyaml.ReadYaml("example/files/invalid.yaml")
+	if err != nil {
+		fmt.Printf("Error reading invalid YAML: %v\n", err)
+	}
+
+	// Check if it's valid YAML
+	if !tyaml.IsYaml(data) {
+		fmt.Println("Invalid YAML format detected")
+	}
+
+	// Try to decode invalid YAML
+	node, err = tyaml.DecodeYaml(data)
+	if err != nil {
+		fmt.Printf("Error decoding invalid YAML: %v\n", err)
+	}
 }

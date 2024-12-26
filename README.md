@@ -1,34 +1,164 @@
-## Transformer
-### Transformer for json, yaml and xml files
+# Transformer
 
-The main purpose of this project is to convert json, yaml and xml files into a golang object.
+Transformer is a Go library that enables conversion between different data formats (JSON, XML, YAML). Using a common data structure, you can perform lossless conversions between these formats.
 
-As you know, there are two ways to convert json, yaml and xml files into an object.
+[Turkish Documentation (Türkçe Dokümantasyon)](README_TR.md)
 
-The first way is to create a struct and running unmarshal. But here we need to write the struct structure. For a large file this will be cumbersome.
+## Features
 
-The second way is to convert it to a map object. Unfortunately, this map object is unordered. Therefore, it does not provide the structure we want.
+- Convert between JSON, XML, and YAML formats
+- Consistent conversion with common data structure
+- Easy to use
+- Type safety
+- Customizable conversion rules
 
-The third way is to write our own key-value structure and design it to be sequential.
+## Installation
 
-This transformer gives us the 3rd path.
+```bash
+go get github.com/mstgnz/transformer
+```
 
-### Features
-- [ ] Json to Node
-- [ ] Yaml to Node
-- [x] Xml to Node
+## Usage
 
+### JSON Conversions
 
-### What will this process bring us?
+```go
+import "github.com/mstgnz/transformer/tjson"
 
-Our structure will hold the next, previous and parent objects along with the key/value. In this way, we will have the opportunity to move on the struct. We can also customize this struct as we want by adding the methods we want.
+// Read JSON file
+data, err := tjson.ReadJson("data.json")
+if err != nil {
+    log.Fatal(err)
+}
 
-File conversion will be made easier using this package.
+// Validate JSON format
+if !tjson.IsJson(data) {
+    log.Fatal("Invalid JSON format")
+}
 
-![Double Linked List](transformer.png)
+// Convert JSON to Node structure
+node, err := tjson.DecodeJson(data)
+if err != nil {
+    log.Fatal(err)
+}
 
-### Contributing
-This project is open-source, and contributions are welcome. Feel free to contribute or provide feedback of any kind.
+// Convert Node structure to JSON
+jsonData, err := tjson.NodeToJson(node)
+if err != nil {
+    log.Fatal(err)
+}
+```
 
-### License
-This project is licensed under the Apache License. See the [LICENSE](https://github.com/mstgnz/transformer/blob/main/LICENSE) file for more details.
+### XML Conversions
+
+```go
+import "github.com/mstgnz/transformer/txml"
+
+// Read XML file
+data, err := txml.ReadXml("data.xml")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Validate XML format
+if !txml.IsXml(data) {
+    log.Fatal("Invalid XML format")
+}
+
+// Convert XML to Node structure
+node, err := txml.DecodeXml(data)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Convert Node structure to XML
+xmlData, err := txml.NodeToXml(node)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### YAML Conversions
+
+```go
+import "github.com/mstgnz/transformer/tyaml"
+
+// Read YAML file
+data, err := tyaml.ReadYaml("data.yaml")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Validate YAML format
+if !tyaml.IsYaml(data) {
+    log.Fatal("Invalid YAML format")
+}
+
+// Convert YAML to Node structure
+node, err := tyaml.DecodeYaml(data)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Convert Node structure to YAML
+yamlData, err := tyaml.NodeToYaml(node)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Cross-Format Conversions
+
+```go
+// JSON -> XML conversion
+jsonData := []byte(`{"name": "John", "age": 30}`)
+node, _ := tjson.DecodeJson(jsonData)
+xmlData, _ := txml.NodeToXml(node)
+
+// XML -> YAML conversion
+xmlData := []byte(`<root><name>John</name><age>30</age></root>`)
+node, _ := txml.DecodeXml(xmlData)
+yamlData, _ := tyaml.NodeToYaml(node)
+
+// YAML -> JSON conversion
+yamlData := []byte(`name: John\nage: 30`)
+node, _ := tyaml.DecodeYaml(yamlData)
+jsonData, _ := tjson.NodeToJson(node)
+```
+
+## Package Structure
+
+- `node`: Contains core data structure and operations
+- `tjson`: Handles JSON conversion operations
+- `txml`: Handles XML conversion operations
+- `tyaml`: Handles YAML conversion operations
+- `example`: Contains example usages
+
+## Data Types
+
+The Node structure supports the following data types:
+
+- `TypeNull`: Null value
+- `TypeObject`: Object (key-value pairs)
+- `TypeArray`: Array
+- `TypeString`: String
+- `TypeNumber`: Number
+- `TypeBoolean`: Boolean
+
+## Contributing
+
+1. Fork this repository
+2. Create a new branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for details.
+
+## Contact
+
+Mesut GENEZ - [@mstgnz](https://github.com/mstgnz)
+
+Project Link: [https://github.com/mstgnz/transformer](https://github.com/mstgnz/transformer)
