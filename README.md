@@ -202,17 +202,54 @@ if err := validateAndConvert(); err != nil {
 
 ## Testing
 
-The library has comprehensive test coverage. To run tests:
+The library has comprehensive test coverage. You can use the following make commands to run tests:
 
+### General Test Commands
 ```bash
 # Run all tests
-go test ./...
+make test
+
+# Run all tests with verbose output
+make test-verbose
 
 # Run tests with coverage
-go test -cover ./...
+make test-cover
 
-# Run tests verbosely
-go test -v ./...
+# Generate HTML coverage report
+make test-coverage-report
+```
+
+### Package Specific Tests
+```bash
+# Run JSON tests
+make test-json
+
+# Run XML tests
+make test-xml
+
+# Run YAML tests
+make test-yaml
+
+# Run Node tests
+make test-node
+
+# Run Benchmark tests
+make test-bench
+```
+
+### Package Specific Coverage Reports
+```bash
+# Run JSON tests with coverage
+make test-json-cover
+
+# Run XML tests with coverage
+make test-xml-cover
+
+# Run YAML tests with coverage
+make test-yaml-cover
+
+# Run Node tests with coverage
+make test-node-cover
 ```
 
 Current test coverage: >90%

@@ -202,17 +202,54 @@ if err := validateAndConvert(); err != nil {
 
 ## Test
 
-Kütüphane kapsamlı test kapsamına sahiptir. Testleri çalıştırmak için:
+Kütüphane kapsamlı test kapsamına sahiptir. Testleri çalıştırmak için aşağıdaki make komutlarını kullanabilirsiniz:
 
+### Genel Test Komutları
 ```bash
 # Tüm testleri çalıştır
-go test ./...
+make test
 
-# Kapsam raporuyla testleri çalıştır
-go test -cover ./...
+# Tüm testleri detaylı çıktı ile çalıştır
+make test-verbose
 
-# Detaylı test çıktısıyla çalıştır
-go test -v ./...
+# Testleri kapsam raporu ile çalıştır
+make test-cover
+
+# HTML kapsam raporu oluştur
+make test-coverage-report
+```
+
+### Paket Özel Testler
+```bash
+# JSON testlerini çalıştır
+make test-json
+
+# XML testlerini çalıştır
+make test-xml
+
+# YAML testlerini çalıştır
+make test-yaml
+
+# Node testlerini çalıştır
+make test-node
+
+# Benchmark testlerini çalıştır
+make test-bench
+```
+
+### Paket Özel Kapsam Raporları
+```bash
+# JSON testlerini kapsam raporu ile çalıştır
+make test-json-cover
+
+# XML testlerini kapsam raporu ile çalıştır
+make test-xml-cover
+
+# YAML testlerini kapsam raporu ile çalıştır
+make test-yaml-cover
+
+# Node testlerini kapsam raporu ile çalıştır
+make test-node-cover
 ```
 
 Mevcut test kapsamı: >90%
