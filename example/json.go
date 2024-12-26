@@ -47,8 +47,9 @@ func JsonExample() {
 	}
 
 	// Try to decode invalid JSON
-	node, err = tjson.DecodeJson(data)
+	_, err = tjson.DecodeJson(data)
 	if err != nil {
 		fmt.Printf("Error decoding invalid JSON: %v\n", err)
 	}
+
 }

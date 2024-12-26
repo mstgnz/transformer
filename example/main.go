@@ -60,10 +60,10 @@ func main() {
 	}
 
 	fmt.Println("\nGenerated YAML:")
-	fmt.Println(string(yamlBytes))
+	fmt.Println(yamlBytes)
 
 	// Parse YAML back to Node
-	yamlNode, err := tyaml.DecodeYaml(yamlBytes)
+	yamlNode, err := tyaml.DecodeYaml([]byte(yamlBytes))
 	if err != nil {
 		fmt.Printf("Error decoding YAML: %v\n", err)
 		return

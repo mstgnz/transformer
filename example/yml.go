@@ -47,7 +47,7 @@ func YmlExample() {
 	}
 
 	// Try to decode invalid YAML
-	node, err = tyaml.DecodeYaml(data)
+	_, err = tyaml.DecodeYaml(data)
 	if err != nil {
 		fmt.Printf("Error decoding invalid YAML: %v\n", err)
 	}

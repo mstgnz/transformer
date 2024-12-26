@@ -47,7 +47,7 @@ func XmlExample() {
 	}
 
 	// Try to decode invalid XML
-	node, err = txml.DecodeXml(data)
+	_, err = txml.DecodeXml(data)
 	if err != nil {
 		fmt.Printf("Error decoding invalid XML: %v\n", err)
 	}
