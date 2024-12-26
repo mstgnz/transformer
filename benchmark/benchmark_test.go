@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// XML için root element tanımlama
+// Defining root element for XML
 type TestData struct {
 	XMLName xml.Name `xml:"data"`
 	Name    string   `json:"name" xml:"name" yaml:"name"`
@@ -22,7 +22,7 @@ var testData = TestData{
 	Hobbies: []string{"okuma", "yazma", "kodlama"},
 }
 
-// Büyük veri seti için XML yapısı
+// XML structure for large data set
 type LargeTestData struct {
 	XMLName xml.Name `xml:"data"`
 	Items   []Item   `json:"items" xml:"items>item" yaml:"items"`
