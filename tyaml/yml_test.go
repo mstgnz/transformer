@@ -148,15 +148,15 @@ func TestReadYml(t *testing.T) {
 	}
 }
 
-func TestNodeToYml(t *testing.T) {
+func TestNodeToYaml(t *testing.T) {
 	tests := []struct {
 		name    string
 		node    *node.Node
-		want    []byte
+		want    string
 		wantErr bool
 	}{
 		{
-			name: "Simple object",
+			name: "basic node",
 			node: &node.Node{
 				Key: "root",
 				Value: &node.Value{
@@ -164,32 +164,91 @@ func TestNodeToYml(t *testing.T) {
 					Node: &node.Node{
 						Key: "key",
 						Value: &node.Value{
-							Type:  node.TypeString,
 							Worth: "value",
+							Type:  node.TypeString,
 						},
 					},
 				},
 			},
-			want:    []byte("key: value\n"),
+			want: `key: value
+`,
 			wantErr: false,
 		},
 		{
-			name:    "Nil node",
+			name: "node with different types",
+			node: &node.Node{
+				Key: "root",
+				Value: &node.Value{
+					Type: node.TypeObject,
+					Node: &node.Node{
+						Key: "number",
+						Value: &node.Value{
+							Worth: "123.45",
+							Type:  node.TypeNumber,
+						},
+						Next: &node.Node{
+							Key: "boolean",
+							Value: &node.Value{
+								Worth: "true",
+								Type:  node.TypeBoolean,
+							},
+							Next: &node.Node{
+								Key: "null",
+								Value: &node.Value{
+									Type: node.TypeNull,
+								},
+							},
+						},
+					},
+				},
+			},
+			want: `number: 123.45
+boolean: true
+"null": null
+`,
+			wantErr: false,
+		},
+		{
+			name: "node with array",
+			node: &node.Node{
+				Key: "root",
+				Value: &node.Value{
+					Type: node.TypeObject,
+					Node: &node.Node{
+						Key: "array",
+						Value: &node.Value{
+							Type: node.TypeArray,
+							Array: []*node.Value{
+								{Worth: "item1", Type: node.TypeString},
+								{Worth: "item2", Type: node.TypeString},
+							},
+						},
+					},
+				},
+			},
+			want: `array:
+- item1
+- item2
+`,
+			wantErr: false,
+		},
+		{
+			name:    "nil node",
 			node:    nil,
-			want:    nil,
+			want:    "",
 			wantErr: true,
 		},
 	}
 
 	for i, tt := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			got, err := NodeToYml(tt.node)
+			got, err := NodeToYaml(tt.node)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NodeToYml() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NodeToYaml() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NodeToYml() = %v, want %v", string(got), string(tt.want))
+				t.Errorf("NodeToYaml() = %v, want %v", string(got), string(tt.want))
 			}
 		})
 	}
