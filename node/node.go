@@ -7,6 +7,38 @@ import (
 	"github.com/fatih/color"
 )
 
+// ValueType represents the type of value stored in a node
+type ValueType int
+
+const (
+	TypeNull ValueType = iota
+	TypeObject
+	TypeArray
+	TypeString
+	TypeNumber
+	TypeBoolean
+)
+
+// String returns the string representation of ValueType
+func (t ValueType) String() string {
+	switch t {
+	case TypeNull:
+		return "null"
+	case TypeObject:
+		return "object"
+	case TypeArray:
+		return "array"
+	case TypeString:
+		return "string"
+	case TypeNumber:
+		return "number"
+	case TypeBoolean:
+		return "boolean"
+	default:
+		return "unknown"
+	}
+}
+
 // Node
 // This Node structure is a double linked list structure.
 // Parent Node link has been added because nested objects are in question.
@@ -24,28 +56,37 @@ type Node struct {
 // This Value structure is enriched to accommodate 3 file types.
 // For each Node, only one of the values of the Value structure can be set (should be)
 type Value struct {
+	Type  ValueType
 	Node  *Node
 	Array []*Value
 	Worth string
 	Attr  map[string]string // for xml
 }
 
+// NewNode creates a new node with the given key
+func NewNode(key string) *Node {
+	return &Node{
+		Key: key,
+		Value: &Value{
+			Type: TypeNull,
+		},
+	}
+}
+
 // AddToStart
 // Adds Node to the root of our node.
 // Our root Node becomes the Next of the new root Node.
 // If the knot that comes as a parameter is not nil, do the operation. Node usage should be implemented accordingly.
-func (n *Node) AddToStart(knot *Node) *Node {
-	if knot == nil {
-		return nil
+func (n *Node) AddToStart(knot *Node) error {
+	if n == nil || knot == nil {
+		return fmt.Errorf("node or knot is nil")
 	}
-	temp := n
-	n = knot
-	n.Next = temp
-	n.Next.Prev = n
-	if n.Next.Next != nil {
-		n.Next.Next.Prev = n.Next
+	knot.Next = n
+	n.Prev = knot
+	if n.Next != nil {
+		n.Next.Prev = n
 	}
-	return n
+	return nil
 }
 
 // AddToNext
@@ -88,57 +129,38 @@ func (n *Node) AddToValue(knot *Node, value *Value) *Node {
 	return knot
 }
 
-// AddToEnd
-// It adds the Node comes with the parameter to the Next of the last Node of our Node.
-// nil control for knot coming with the parameter is not required as it will not cause an error.
-func (n *Node) AddToEnd(knot *Node) *Node {
+// AddToEnd adds a node to the end of the list
+func (n *Node) AddToEnd(knot *Node) error {
 	if n == nil || knot == nil {
-		return nil
+		return fmt.Errorf("node or knot is nil")
 	}
-	iter := n
-	for iter.Next != nil {
-		iter = iter.Next
-	}
-	knot.Prev = iter
-	iter.Next = knot
-	return knot
+	n.Value.Type = TypeObject
+	n.Value.Node = knot
+	knot.Parent = n
+	return nil
 }
 
-// Delete
-// If the Node to be deleted is root, root's next is assigned as the new root.
-func (n *Node) Delete(knot *Node) *Node {
-	if n == nil || knot == nil {
-		return n
+// Delete removes the node from the list
+func (n *Node) Delete() error {
+	if n == nil {
+		return fmt.Errorf("node is nil")
 	}
-
-	if n == knot {
-		if n.Next != nil {
-			n = n.Next
-			n.Prev = nil
-		} else {
-			n = &Node{}
-		}
-		return n
+	if n.Parent == nil {
+		return fmt.Errorf("cannot delete root node")
 	}
-
-	iter := n
-	for iter != nil && iter.Next != knot {
-		iter = iter.Next
+	if n.Prev != nil {
+		n.Prev.Next = n.Next
 	}
-
-	if iter != nil && iter.Next == knot {
-		if iter.Next.Next != nil {
-			iter.Next = iter.Next.Next
-			iter.Next.Prev = iter
-		} else {
-			iter.Next = nil
-		}
+	if n.Next != nil {
+		n.Next.Prev = n.Prev
 	}
-	return n
+	if n.Parent.Value.Node == n {
+		n.Parent.Value.Node = n.Next
+	}
+	return nil
 }
 
-// GetNode
-// It searches nested according to the Key comes as a parameter.
+// GetNode returns all nodes with the given key
 func (n *Node) GetNode(key string) []*Node {
 	var list []*Node
 	var search func(node *Node)
@@ -147,16 +169,15 @@ func (n *Node) GetNode(key string) []*Node {
 			if node.Key == key {
 				list = append(list, node)
 			}
-			// if Node Value.Node exists
-			if node.Value.Node != nil {
-				search(node.Value.Node)
-			}
-			// if Node Value.Array exists
-			if len(node.Value.Array) > 0 {
-				for _, slc := range node.Value.Array {
-					// if Array.Value.Node exists
-					if slc.Node != nil {
-						search(slc.Node)
+			if node.Value != nil {
+				if node.Value.Node != nil {
+					search(node.Value.Node)
+				}
+				if len(node.Value.Array) > 0 {
+					for _, v := range node.Value.Array {
+						if v.Node != nil {
+							search(v.Node)
+						}
 					}
 				}
 			}
@@ -167,68 +188,145 @@ func (n *Node) GetNode(key string) []*Node {
 	return list
 }
 
-// Print
-// You can get output to see the node tree structure.
-func (n *Node) Print() {
-	var write func(node *Node)
-	level := 0
-	write = func(node *Node) {
-		for node != nil {
-			node.print(node, level)
-
-			// if Node Value.Node exists
-			if node.Value != nil && node.Value.Node != nil {
-				if len(node.Key) == 0 {
-					node.Key = "array"
+// GetNodeByPath returns the node at the given path
+func (n *Node) GetNodeByPath(path string) *Node {
+	if path == "" {
+		return nil
+	}
+	parts := strings.Split(path, ".")
+	current := n.Reset()
+	for _, part := range parts {
+		found := false
+		for current != nil {
+			if current.Key == part {
+				found = true
+				if current.Value != nil && current.Value.Node != nil {
+					current = current.Value.Node
 				}
-				level++
-				write(node.Value.Node)
+				break
 			}
+			current = current.Next
+		}
+		if !found {
+			return nil
+		}
+	}
+	return current
+}
 
-			// if Node Value.Array exists
-			if node.Value != nil && len(node.Value.Array) > 0 {
-				for _, slc := range node.Value.Array {
-					// if Array.Value.Node exists
-					if slc.Node != nil {
-						level++
-						write(slc.Node)
+// FindNodes returns all nodes that match the predicate
+func (n *Node) FindNodes(predicate func(*Node) bool) []*Node {
+	var list []*Node
+	var search func(node *Node)
+	search = func(node *Node) {
+		for node != nil {
+			if predicate(node) {
+				list = append(list, node)
+			}
+			if node.Value != nil {
+				if node.Value.Node != nil {
+					search(node.Value.Node)
+				}
+				if len(node.Value.Array) > 0 {
+					for _, v := range node.Value.Array {
+						if v.Node != nil {
+							search(v.Node)
+						}
 					}
 				}
-			}
-			if node.Next == nil && node.Parent != nil {
-				level--
 			}
 			node = node.Next
 		}
 	}
-	write(n.Reset())
+	search(n.Reset())
+	return list
 }
 
-// print It belongs to Print
-func (n *Node) print(knot *Node, level int) {
-	indent := strings.Repeat("  ", level)
-	fmt.Printf("%s%v %v %v %+v\n",
-		indent,
-		color.YellowString("Key: "),
-		knot.Key,
-		color.YellowString("Value:"),
-		knot.Value)
-}
-
-// Reset
-// It goes to the root of our Node.
+// Reset returns the root node
 func (n *Node) Reset() *Node {
-	iter := n
-	for iter.Parent != nil {
-		iter = iter.Parent
+	if n == nil {
+		return nil
 	}
-	for iter.Prev != nil {
-		iter = iter.Prev
+	current := n
+	for current.Parent != nil {
+		current = current.Parent
 	}
-	return iter
+	for current.Prev != nil {
+		current = current.Prev
+	}
+	return current
 }
 
-// Exists Node
+// Exists returns true if the node exists
 func (n *Node) Exists() bool {
 	return n != nil
+}
+
+// Validate checks if the node structure is valid
+func (n *Node) Validate() error {
+	if n == nil {
+		return fmt.Errorf("node is nil")
+	}
+
+	// Check parent-child relationships
+	if n.Parent != nil {
+		if n.Parent.Value == nil || n.Parent.Value.Node != n {
+			return fmt.Errorf("invalid parent-child relationship")
+		}
+	}
+
+	// Check next-prev relationships
+	if n.Next != nil && n.Next.Prev != n {
+		return fmt.Errorf("invalid next-prev relationship")
+	}
+	if n.Prev != nil && n.Prev.Next != n {
+		return fmt.Errorf("invalid prev-next relationship")
+	}
+
+	// Recursively validate child nodes
+	if n.Value != nil && n.Value.Node != nil {
+		if err := n.Value.Node.Validate(); err != nil {
+			return err
+		}
+	}
+
+	// Validate next nodes
+	if n.Next != nil {
+		if err := n.Next.Validate(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Print prints the node tree
+func (n *Node) Print() {
+	var print func(node *Node, level int)
+	print = func(node *Node, level int) {
+		for node != nil {
+			indent := strings.Repeat("  ", level)
+			fmt.Printf("%s%s%s %s%v\n",
+				indent,
+				color.YellowString("Key:"),
+				node.Key,
+				color.YellowString("Value:"),
+				node.Value)
+
+			if node.Value != nil {
+				if node.Value.Node != nil {
+					print(node.Value.Node, level+1)
+				}
+				if len(node.Value.Array) > 0 {
+					for _, v := range node.Value.Array {
+						if v.Node != nil {
+							print(v.Node, level+1)
+						}
+					}
+				}
+			}
+			node = node.Next
+		}
+	}
+	print(n.Reset(), 0)
 }
