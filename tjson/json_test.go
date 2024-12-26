@@ -10,28 +10,33 @@ import (
 )
 
 func TestIsJson(t *testing.T) {
+	validJson, err := os.ReadFile("../example/files/valid.json")
+	if err != nil {
+		t.Fatalf("Error reading valid.json: %v", err)
+	}
+
+	invalidJson, err := os.ReadFile("../example/files/invalid.json")
+	if err != nil {
+		t.Fatalf("Error reading invalid.json: %v", err)
+	}
+
 	tests := []struct {
 		name string
 		data []byte
 		want bool
 	}{
 		{
-			name: "Valid JSON object",
-			data: []byte(`{"key": "value"}`),
+			name: "valid json",
+			data: validJson,
 			want: true,
 		},
 		{
-			name: "Valid JSON array",
-			data: []byte(`[1, 2, 3]`),
-			want: true,
-		},
-		{
-			name: "Invalid JSON",
-			data: []byte(`{"key": "value"`),
+			name: "invalid json",
+			data: invalidJson,
 			want: false,
 		},
 		{
-			name: "Empty input",
+			name: "empty json",
 			data: []byte{},
 			want: false,
 		},
