@@ -225,6 +225,38 @@ The library is optimized for:
 - Large file handling
 - Concurrent operations
 
+### Benchmark Results
+
+```bash
+goos: darwin
+goarch: arm64
+cpu: Apple M1
+BenchmarkJSONMarshal-8           4416622               261.0 ns/op           192 B/op          2 allocs/op
+BenchmarkXMLMarshal-8             975189              1230 ns/op            4704 B/op         10 allocs/op
+BenchmarkYAMLMarshal-8            213493              5284 ns/op           16728 B/op         47 allocs/op
+BenchmarkJSONUnmarshal-8         1000000              1742 ns/op             272 B/op          9 allocs/op
+BenchmarkXMLUnmarshal-8           370683              3104 ns/op            2328 B/op         56 allocs/op
+BenchmarkYAMLUnmarshal-8          142972              8640 ns/op           10128 B/op        108 allocs/op
+BenchmarkLargeJSONMarshal-8        66734             17580 ns/op           10953 B/op          2 allocs/op
+BenchmarkLargeXMLMarshal-8         12298             97192 ns/op           33456 B/op         15 allocs/op
+BenchmarkLargeYAMLMarshal-8         2500            466568 ns/op         1581555 B/op       3149 allocs/op
+```
+
+#### Analysis
+- **JSON** shows the best performance in both marshaling and unmarshaling operations
+  - Marshal: ~261 ns/op with only 2 allocations
+  - Unmarshal: ~1.7 µs/op with 9 allocations
+- **XML** performs slower than JSON
+  - Marshal: ~1.2 µs/op with 10 allocations
+  - Unmarshal: ~3.1 µs/op with 56 allocations
+- **YAML** shows the highest resource usage
+  - Marshal: ~5.2 µs/op with 47 allocations
+  - Unmarshal: ~8.6 µs/op with 108 allocations
+- For large data operations:
+  - JSON maintains efficiency with minimal allocations
+  - XML shows moderate performance degradation
+  - YAML shows significant increase in both time and memory usage
+
 ## Security
 
 - Input validation to prevent XML entity attacks

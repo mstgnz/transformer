@@ -219,11 +219,43 @@ Mevcut test kapsamı: >90%
 
 ## Performans
 
-Kütüphane şunlar için optimize edilmiştir:
+Kütüphane aşağıdaki konularda optimize edilmiştir:
 - Bellek verimliliği
 - CPU kullanımı
 - Büyük dosya işleme
 - Eşzamanlı işlemler
+
+### Benchmark Sonuçları
+
+```bash
+goos: darwin
+goarch: arm64
+cpu: Apple M1
+BenchmarkJSONMarshal-8           4416622               261.0 ns/op           192 B/op          2 allocs/op
+BenchmarkXMLMarshal-8             975189              1230 ns/op            4704 B/op         10 allocs/op
+BenchmarkYAMLMarshal-8            213493              5284 ns/op           16728 B/op         47 allocs/op
+BenchmarkJSONUnmarshal-8         1000000              1742 ns/op             272 B/op          9 allocs/op
+BenchmarkXMLUnmarshal-8           370683              3104 ns/op            2328 B/op         56 allocs/op
+BenchmarkYAMLUnmarshal-8          142972              8640 ns/op           10128 B/op        108 allocs/op
+BenchmarkLargeJSONMarshal-8        66734             17580 ns/op           10953 B/op          2 allocs/op
+BenchmarkLargeXMLMarshal-8         12298             97192 ns/op           33456 B/op         15 allocs/op
+BenchmarkLargeYAMLMarshal-8         2500            466568 ns/op         1581555 B/op       3149 allocs/op
+```
+
+#### Analiz
+- **JSON** hem marshal hem de unmarshal işlemlerinde en iyi performansı göstermektedir
+  - Marshal: ~261 ns/op ve sadece 2 bellek tahsisi
+  - Unmarshal: ~1.7 µs/op ve 9 bellek tahsisi
+- **XML** JSON'a göre daha yavaş performans göstermektedir
+  - Marshal: ~1.2 µs/op ve 10 bellek tahsisi
+  - Unmarshal: ~3.1 µs/op ve 56 bellek tahsisi
+- **YAML** en yüksek kaynak kullanımına sahiptir
+  - Marshal: ~5.2 µs/op ve 47 bellek tahsisi
+  - Unmarshal: ~8.6 µs/op ve 108 bellek tahsisi
+- Büyük veri işlemleri için:
+  - JSON minimal bellek tahsisi ile verimliliğini korumaktadır
+  - XML orta düzeyde performans düşüşü göstermektedir
+  - YAML hem süre hem de bellek kullanımında önemli artış göstermektedir
 
 ## Güvenlik
 
