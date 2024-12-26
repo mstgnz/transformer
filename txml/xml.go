@@ -1,5 +1,3 @@
-// Package txml provides functionality for handling XML data using the Node structure.
-// It includes functions for reading, validating, encoding, and decoding XML data.
 package txml
 
 import (
@@ -7,27 +5,94 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/mstgnz/transformer/node"
 )
 
-// IsXml checks if the given bytes represent valid XML
-func IsXml(data []byte) bool {
-	return xml.Unmarshal(data, new(interface{})) == nil
-}
+// DecodeXml decodes XML bytes into a Node
+func DecodeXml(data []byte) (*node.Node, error) {
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	root := &node.Node{
+		Key: "root",
+		Value: &node.Value{
+			Type: node.TypeObject,
+		},
+	}
 
-// ReadXml reads an XML file and returns its contents as bytes
-func ReadXml(filename string) ([]byte, error) {
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
+	var current *node.Node = root
+	var stack []*node.Node
+	var textContent string
+
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		switch t := token.(type) {
+		case xml.StartElement:
+			n := &node.Node{
+				Key: t.Name.Local,
+				Value: &node.Value{
+					Type: node.TypeObject,
+				},
+			}
+
+			// Handle attributes
+			if len(t.Attr) > 0 {
+				n.Value.Type = node.TypeObject
+				for _, attr := range t.Attr {
+					attrNode := &node.Node{
+						Key: attr.Name.Local,
+						Value: &node.Value{
+							Type:  node.TypeString,
+							Worth: attr.Value,
+						},
+					}
+					if err := n.AddToEnd(attrNode); err != nil {
+						return nil, err
+					}
+				}
+			}
+
+			if err := current.AddToEnd(n); err != nil {
+				return nil, err
+			}
+
+			stack = append(stack, current)
+			current = n
+
+		case xml.EndElement:
+			if textContent != "" {
+				current.Value = &node.Value{
+					Type:  node.TypeString,
+					Worth: textContent,
+				}
+				textContent = ""
+			} else if current.Value.Type == node.TypeObject && current.Value.Node == nil {
+				current.Value = &node.Value{
+					Type: node.TypeNull,
+				}
+			}
+
+			if len(stack) > 0 {
+				current = stack[len(stack)-1]
+				stack = stack[:len(stack)-1]
+			}
+
+		case xml.CharData:
+			text := strings.TrimSpace(string(t))
+			if text != "" {
+				textContent = text
+			}
+		}
 	}
-	if !IsXml(data) {
-		return nil, fmt.Errorf("invalid XML format")
-	}
-	return data, nil
+
+	return root, nil
 }
 
 // NodeToXml converts a Node to XML bytes
@@ -197,106 +262,4 @@ func escapeXml(s string) string {
 	s = strings.ReplaceAll(s, "\"", "&quot;")
 	s = strings.ReplaceAll(s, "'", "&apos;")
 	return s
-}
-
-// DecodeXml decodes XML bytes into a Node
-func DecodeXml(data []byte) (*node.Node, error) {
-	decoder := xml.NewDecoder(bytes.NewReader(data))
-	root := &node.Node{
-		Key: "root",
-		Value: &node.Value{
-			Type: node.TypeObject,
-		},
-	}
-
-	var current *node.Node = root
-	var stack []*node.Node
-	var textContent string
-
-	for {
-		token, err := decoder.Token()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		switch t := token.(type) {
-		case xml.StartElement:
-			n := &node.Node{
-				Key: t.Name.Local,
-				Value: &node.Value{
-					Type: node.TypeObject,
-				},
-			}
-
-			// Handle attributes
-			if len(t.Attr) > 0 {
-				n.Value.Type = node.TypeObject
-				for _, attr := range t.Attr {
-					attrNode := &node.Node{
-						Key: attr.Name.Local,
-						Value: &node.Value{
-							Type:  node.TypeString,
-							Worth: attr.Value,
-						},
-					}
-					if err := n.AddToEnd(attrNode); err != nil {
-						return nil, err
-					}
-				}
-			}
-
-			if err := current.AddToEnd(n); err != nil {
-				return nil, err
-			}
-
-			stack = append(stack, current)
-			current = n
-
-		case xml.EndElement:
-			if textContent != "" {
-				current.Value = &node.Value{
-					Type:  node.TypeString,
-					Worth: textContent,
-				}
-				textContent = ""
-			} else if current.Value.Type == node.TypeObject && current.Value.Node == nil {
-				current.Value = &node.Value{
-					Type: node.TypeNull,
-				}
-			}
-
-			if len(stack) > 0 {
-				current = stack[len(stack)-1]
-				stack = stack[:len(stack)-1]
-			}
-
-		case xml.CharData:
-			text := strings.TrimSpace(string(t))
-			if text != "" {
-				textContent = text
-			}
-		}
-	}
-
-	return root, nil
-}
-
-// ParseXml parses XML data into a map
-func ParseXml(data []byte) (map[string]interface{}, error) {
-	var result interface{}
-	decoder := xml.NewDecoder(bytes.NewReader(data))
-	decoder.Strict = false
-	if err := decoder.Decode(&result); err != nil {
-		return nil, fmt.Errorf("unmarshal error: %v", err)
-	}
-
-	if m, ok := result.(map[string]interface{}); ok {
-		return m, nil
-	}
-
-	// If the root is not a map, wrap it in a map with a "root" key
-	return map[string]interface{}{"root": result}, nil
 }
