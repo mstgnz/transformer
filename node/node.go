@@ -1,25 +1,33 @@
+// Package node provides a tree-based data structure implementation for handling hierarchical data.
+// It supports various data types including objects, arrays, strings, numbers, and booleans.
+// The package is designed to be flexible and can be used for parsing and manipulating
+// different data formats like JSON, XML, and YAML.
 package node
 
 import (
 	"fmt"
 	"strings"
-
-	"github.com/fatih/color"
 )
 
-// ValueType represents the type of value stored in a node
+// ValueType represents the type of a value in the node tree.
+// It is implemented as an integer constant to efficiently identify
+// the type of data stored in a node's value.
 type ValueType int
 
+// Constants representing different value types that can be stored in a node.
+// These types align with common data format types (JSON, XML, YAML) for easy conversion.
 const (
-	TypeNull ValueType = iota
-	TypeObject
-	TypeArray
-	TypeString
-	TypeNumber
-	TypeBoolean
+	TypeNull    ValueType = iota // Represents a null/nil value
+	TypeObject                   // Represents an object/map type that can contain child nodes
+	TypeArray                    // Represents an array/slice type that can contain multiple values
+	TypeString                   // Represents a string value
+	TypeNumber                   // Represents a numeric value
+	TypeBoolean                  // Represents a boolean value
 )
 
-// String returns the string representation of ValueType
+// String returns the string representation of a ValueType.
+// This method is useful for debugging and logging purposes.
+// It converts the internal ValueType constant to a human-readable string.
 func (t ValueType) String() string {
 	switch t {
 	case TypeNull:
@@ -39,31 +47,30 @@ func (t ValueType) String() string {
 	}
 }
 
-// Node
-// This Node structure is a double linked list structure.
-// Parent Node link has been added because nested objects are in question.
-// Since Json, Yaml and Xml objects are nested, the Value type of our Node structure is designed as a Value structure.
-// This Node structure accommodates 3 file types, allows you to do the necessary manipulations and outputs the file type you want.
-type Node struct {
-	Key    string
-	Value  *Value
-	Next   *Node
-	Prev   *Node
-	Parent *Node
-}
-
-// Value struct type of Node Value.
-// This Value structure is enriched to accommodate 3 file types.
-// For each Node, only one of the values of the Value structure can be set (should be)
+// Value represents a value stored in a node of the tree.
+// It contains the type of the value and the actual data,
+// which can be a primitive value, an object (node), or an array.
 type Value struct {
-	Type  ValueType
-	Node  *Node
-	Array []*Value
-	Worth string
-	Attr  map[string]string // for xml
+	Type  ValueType // The type of the value (null, object, array, string, number, boolean)
+	Worth string    // The actual value as a string (for primitive types)
+	Node  *Node     // Reference to a child node (for object types)
+	Array []*Value  // Array of values (for array types)
 }
 
-// NewNode creates a new node with the given key
+// Node represents a single node in the tree structure.
+// Each node can have a key, a value, a parent node, and next/previous sibling nodes.
+// This structure allows for building complex hierarchical data structures.
+type Node struct {
+	Key    string // The key/name of the node
+	Value  *Value // The value stored in the node
+	Parent *Node  // Reference to the parent node
+	Next   *Node  // Reference to the next sibling node
+	Prev   *Node  // Reference to the previous sibling node
+}
+
+// NewNode creates a new Node with the given key.
+// The new node is initialized with a null value type.
+// This is the primary constructor for creating new nodes in the tree.
 func NewNode(key string) *Node {
 	return &Node{
 		Key: key,
@@ -73,134 +80,349 @@ func NewNode(key string) *Node {
 	}
 }
 
-// AddToStart
-// Adds Node to the root of our node.
-// Our root Node becomes the Next of the new root Node.
-// If the knot that comes as a parameter is not nil, do the operation. Node usage should be implemented accordingly.
-func (n *Node) AddToStart(knot *Node) error {
-	if n == nil || knot == nil {
-		return fmt.Errorf("node or knot is nil")
+// AddToStart adds a node to the start of the current node's children.
+// If the current node has no children, the added node becomes the first child.
+// If there are existing children, the added node becomes the first child,
+// and the existing children are shifted to the right.
+// Returns an error if either the current node or the node to add is nil.
+func (n *Node) AddToStart(node *Node) error {
+	if n == nil {
+		return fmt.Errorf("node is nil")
 	}
-	knot.Next = n
-	n.Prev = knot
-	if n.Next != nil {
-		n.Next.Prev = n
-	}
-	return nil
-}
 
-// AddToNext
-// Adds a new Node next to the current Node and returns the new Node.
-// Prev of the newly created Node is the Node comes with the parameter.
-// The Parent comes as a parameter is the Parent of the Node to be created.
-// The nil control for the knot that comes as a parameter is only for the health of the flow.
-func (n *Node) AddToNext(knot *Node, parent *Node, key string) *Node {
-	if parent != nil {
-		parent = parent.Parent
+	if node == nil {
+		return fmt.Errorf("node to add is nil")
 	}
-	if knot == nil {
-		return &Node{Key: key, Prev: knot, Parent: parent}
-	}
-	knot.Next = &Node{Key: key, Prev: knot, Parent: parent}
-	return knot.Next
-}
 
-// AddToValue
-// Sets the Value of the current Node to the given Value
-// If the Node in the given Value structure is not empty, it returns this Node.
-// If the Array in the given Value structure is not empty and the last element of the Array is a Node and not nil, return this Node.
-// The nil control for the Node that comes with the parameter is necessary for flow health. Node usage should be implemented accordingly.
-func (n *Node) AddToValue(knot *Node, value *Value) *Node {
-	if knot == nil {
-		return nil
-	}
-	parent := knot
-	knot.Value = value
-	if knot.Value.Node != nil {
-		knot.Value.Node.Parent = parent
-		return knot.Value.Node
-	}
-	if size := len(knot.Value.Array); size > 0 {
-		slcNode := knot.Value.Array[size-1].Node
-		if slcNode != nil {
-			return slcNode
+	if n.Value == nil {
+		n.Value = &Value{
+			Type: TypeObject,
 		}
+	} else if n.Value.Type != TypeObject {
+		n.Value.Type = TypeObject
 	}
-	return knot
-}
 
-// AddToEnd adds a node to the end of the list
-func (n *Node) AddToEnd(knot *Node) error {
-	if n == nil || knot == nil {
-		return fmt.Errorf("node or knot is nil")
+	node.Parent = n
+	if n.Value.Node == nil {
+		n.Value.Node = node
+	} else {
+		node.Next = n.Value.Node
+		n.Value.Node.Prev = node
+		n.Value.Node = node
 	}
-	n.Value.Type = TypeObject
-	n.Value.Node = knot
-	knot.Parent = n
+
 	return nil
 }
 
-// Delete removes the node from the list
+// AddToEnd adds a node to the end of the current node's children.
+// If the current node has no children, the added node becomes the first child.
+// If there are existing children, the added node is appended after the last child.
+// Returns an error if either the current node or the node to add is nil.
+func (n *Node) AddToEnd(node *Node) error {
+	if n == nil {
+		return fmt.Errorf("node is nil")
+	}
+
+	if node == nil {
+		return fmt.Errorf("node to add is nil")
+	}
+
+	if n.Value == nil {
+		n.Value = &Value{
+			Type: TypeObject,
+		}
+	} else if n.Value.Type != TypeObject {
+		n.Value.Type = TypeObject
+	}
+
+	node.Parent = n
+	if n.Value.Node == nil {
+		n.Value.Node = node
+	} else {
+		current := n.Value.Node
+		for current.Next != nil {
+			current = current.Next
+		}
+		current.Next = node
+		node.Prev = current
+	}
+
+	return nil
+}
+
+// AddToValue adds a value to the current node.
+// This method is used to set or update the value of a node.
+// If the value contains a node, the parent reference of that node is updated.
+// Returns an error if either the current node or the value to add is nil.
+func (n *Node) AddToValue(value *Value) error {
+	if n == nil {
+		return fmt.Errorf("node is nil")
+	}
+
+	if value == nil {
+		return fmt.Errorf("value to add is nil")
+	}
+
+	n.Value = value
+	if value.Node != nil {
+		value.Node.Parent = n
+	}
+
+	return nil
+}
+
+// Delete removes the current node from its parent.
+// This method handles updating the linked list of siblings and parent references.
+// Returns an error if the node is nil, is a root node, or if the parent is invalid.
 func (n *Node) Delete() error {
 	if n == nil {
 		return fmt.Errorf("node is nil")
 	}
+
 	if n.Parent == nil {
 		return fmt.Errorf("cannot delete root node")
 	}
+
+	if n.Parent.Value == nil || n.Parent.Value.Type != TypeObject {
+		return fmt.Errorf("parent is not an object")
+	}
+
 	if n.Prev != nil {
 		n.Prev.Next = n.Next
+	} else {
+		n.Parent.Value.Node = n.Next
 	}
+
 	if n.Next != nil {
 		n.Next.Prev = n.Prev
 	}
-	if n.Parent.Value.Node == n {
-		n.Parent.Value.Node = n.Next
-	}
+
+	n.Parent = nil
+	n.Next = nil
+	n.Prev = nil
+
 	return nil
 }
 
-// GetNode returns all nodes with the given key
-func (n *Node) GetNode(key string) []*Node {
-	var list []*Node
-	var search func(node *Node)
-	search = func(node *Node) {
-		for node != nil {
-			if node.Key == key {
-				list = append(list, node)
-			}
-			if node.Value != nil {
-				if node.Value.Node != nil {
-					search(node.Value.Node)
+// Print displays the node tree structure in a human-readable format.
+// This is a wrapper around the private print method that handles indentation.
+// The output format is similar to JSON but with custom formatting for different types.
+func (n *Node) Print() {
+	n.print(0)
+}
+
+// print is a helper function for Print that handles indentation.
+// It recursively prints the node tree with proper indentation for nested structures.
+// The indentation parameter determines the number of spaces to add before each line.
+func (n *Node) print(indent int) {
+	if n == nil {
+		return
+	}
+
+	indentStr := strings.Repeat("  ", indent)
+	fmt.Printf("%s%s: ", indentStr, n.Key)
+
+	if n.Value == nil {
+		fmt.Println("null")
+		return
+	}
+
+	switch n.Value.Type {
+	case TypeObject:
+		fmt.Println("{")
+		current := n.Value.Node
+		for current != nil {
+			current.print(indent + 1)
+			current = current.Next
+		}
+		fmt.Printf("%s}\n", indentStr)
+
+	case TypeArray:
+		fmt.Println("[")
+		for i, item := range n.Value.Array {
+			if item == nil {
+				fmt.Printf("%s  null", indentStr)
+			} else if item.Node != nil {
+				item.Node.print(indent + 1)
+			} else {
+				switch item.Type {
+				case TypeString:
+					fmt.Printf("%s  \"%s\"", indentStr, item.Worth)
+				case TypeNull:
+					fmt.Printf("%s  null", indentStr)
+				default:
+					fmt.Printf("%s  %v", indentStr, item.Worth)
 				}
-				if len(node.Value.Array) > 0 {
-					for _, v := range node.Value.Array {
-						if v.Node != nil {
-							search(v.Node)
-						}
+			}
+			if i < len(n.Value.Array)-1 {
+				fmt.Printf("\n%s  ,\n", indentStr)
+			}
+		}
+		fmt.Printf("\n%s]\n", indentStr)
+
+	case TypeString:
+		fmt.Printf("\"%s\"\n", n.Value.Worth)
+
+	case TypeNumber:
+		fmt.Println(n.Value.Worth)
+
+	case TypeBoolean:
+		fmt.Println(n.Value.Worth)
+
+	case TypeNull:
+		fmt.Println("null")
+
+	default:
+		fmt.Printf("unknown type: %v\n", n.Value.Type)
+	}
+}
+
+// Validate checks if the node tree structure is valid.
+// It verifies:
+// - Parent-child relationships are properly set
+// - Next-prev sibling relationships are consistent
+// - All nodes have valid values
+// - Array values are valid
+// Returns an error if any validation fails.
+func (n *Node) Validate() error {
+	if n == nil {
+		return fmt.Errorf("node is nil")
+	}
+
+	if n.Value == nil {
+		return fmt.Errorf("value is nil for node %s", n.Key)
+	}
+
+	// Check parent-child relationships
+	if n.Parent != nil {
+		if n.Parent.Value == nil || n.Parent.Value.Type != TypeObject {
+			return fmt.Errorf("parent of node %s is not an object", n.Key)
+		}
+
+		found := false
+		current := n.Parent.Value.Node
+		for current != nil {
+			if current == n {
+				found = true
+				break
+			}
+			current = current.Next
+		}
+		if !found {
+			return fmt.Errorf("node %s is not in parent's children", n.Key)
+		}
+	}
+
+	// Check next-prev relationships
+	if n.Next != nil {
+		if n.Next.Prev != n {
+			return fmt.Errorf("next node's prev pointer does not point back to node %s", n.Key)
+		}
+	}
+	if n.Prev != nil {
+		if n.Prev.Next != n {
+			return fmt.Errorf("prev node's next pointer does not point back to node %s", n.Key)
+		}
+	}
+
+	// Validate children
+	if n.Value.Type == TypeObject {
+		current := n.Value.Node
+		for current != nil {
+			if err := current.Validate(); err != nil {
+				return fmt.Errorf("invalid child node %s: %v", current.Key, err)
+			}
+			current = current.Next
+		}
+	}
+
+	// Validate array values
+	if n.Value.Type == TypeArray {
+		for i, item := range n.Value.Array {
+			if item == nil {
+				continue
+			}
+			if item.Node != nil {
+				if err := item.Node.Validate(); err != nil {
+					return fmt.Errorf("invalid array item %d: %v", i, err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetNode searches for nodes with the given key in the entire node tree.
+// It performs a depth-first search through the tree, including:
+// - Direct children
+// - Nested objects
+// - Array items
+// Returns a slice of all matching nodes.
+func (n *Node) GetNode(key string) []*Node {
+	if n == nil {
+		return nil
+	}
+
+	var nodes []*Node
+	var search func(node *Node)
+
+	search = func(node *Node) {
+		if node == nil {
+			return
+		}
+
+		// Check current node
+		if node.Key == key {
+			nodes = append(nodes, node)
+		}
+
+		// Check node's value
+		if node.Value != nil {
+			// Check nested object
+			if node.Value.Type == TypeObject && node.Value.Node != nil {
+				search(node.Value.Node)
+			}
+
+			// Check array items
+			if node.Value.Type == TypeArray {
+				for _, item := range node.Value.Array {
+					if item != nil && item.Node != nil {
+						search(item.Node)
 					}
 				}
 			}
-			node = node.Next
+		}
+
+		// Check next sibling
+		if node.Next != nil {
+			search(node.Next)
 		}
 	}
-	search(n.Reset())
-	return list
+
+	// Start search from root
+	search(n)
+	return nodes
 }
 
-// GetNodeByPath returns the node at the given path
+// GetNodeByPath searches for a node using a path-like key.
+// The path format is dot-separated, e.g., "root.child.grandchild".
+// It traverses the tree following the path components.
+// Returns the first matching node or nil if not found.
 func (n *Node) GetNodeByPath(path string) *Node {
-	if path == "" {
+	if n == nil || path == "" {
 		return nil
 	}
+
 	parts := strings.Split(path, ".")
-	current := n.Reset()
+	current := n
+
 	for _, part := range parts {
 		found := false
 		for current != nil {
 			if current.Key == part {
 				found = true
-				if current.Value != nil && current.Value.Node != nil {
+				if current.Value != nil && current.Value.Type == TypeObject {
 					current = current.Value.Node
 				}
 				break
@@ -211,122 +433,56 @@ func (n *Node) GetNodeByPath(path string) *Node {
 			return nil
 		}
 	}
+
 	return current
 }
 
-// FindNodes returns all nodes that match the predicate
+// FindNodes searches for nodes that match the given predicate function.
+// The predicate function should return true for nodes that match the search criteria.
+// It performs a depth-first search through the entire tree structure.
+// Returns a slice of all matching nodes.
 func (n *Node) FindNodes(predicate func(*Node) bool) []*Node {
-	var list []*Node
-	var search func(node *Node)
-	search = func(node *Node) {
-		for node != nil {
-			if predicate(node) {
-				list = append(list, node)
-			}
-			if node.Value != nil {
-				if node.Value.Node != nil {
-					search(node.Value.Node)
-				}
-				if len(node.Value.Array) > 0 {
-					for _, v := range node.Value.Array {
-						if v.Node != nil {
-							search(v.Node)
-						}
-					}
-				}
-			}
-			node = node.Next
-		}
-	}
-	search(n.Reset())
-	return list
-}
-
-// Reset returns the root node
-func (n *Node) Reset() *Node {
-	if n == nil {
+	if n == nil || predicate == nil {
 		return nil
 	}
-	current := n
-	for current.Parent != nil {
-		current = current.Parent
-	}
-	for current.Prev != nil {
-		current = current.Prev
-	}
-	return current
-}
 
-// Exists returns true if the node exists
-func (n *Node) Exists() bool {
-	return n != nil
-}
+	var nodes []*Node
+	var search func(node *Node)
 
-// Validate checks if the node structure is valid
-func (n *Node) Validate() error {
-	if n == nil {
-		return fmt.Errorf("node is nil")
-	}
-
-	// Check parent-child relationships
-	if n.Parent != nil {
-		if n.Parent.Value == nil || n.Parent.Value.Node != n {
-			return fmt.Errorf("invalid parent-child relationship")
+	search = func(node *Node) {
+		if node == nil {
+			return
 		}
-	}
 
-	// Check next-prev relationships
-	if n.Next != nil && n.Next.Prev != n {
-		return fmt.Errorf("invalid next-prev relationship")
-	}
-	if n.Prev != nil && n.Prev.Next != n {
-		return fmt.Errorf("invalid prev-next relationship")
-	}
-
-	// Recursively validate child nodes
-	if n.Value != nil && n.Value.Node != nil {
-		if err := n.Value.Node.Validate(); err != nil {
-			return err
+		// Check current node
+		if predicate(node) {
+			nodes = append(nodes, node)
 		}
-	}
 
-	// Validate next nodes
-	if n.Next != nil {
-		if err := n.Next.Validate(); err != nil {
-			return err
-		}
-	}
+		// Check node's value
+		if node.Value != nil {
+			// Check nested object
+			if node.Value.Type == TypeObject && node.Value.Node != nil {
+				search(node.Value.Node)
+			}
 
-	return nil
-}
-
-// Print prints the node tree
-func (n *Node) Print() {
-	var print func(node *Node, level int)
-	print = func(node *Node, level int) {
-		for node != nil {
-			indent := strings.Repeat("  ", level)
-			fmt.Printf("%s%s%s %s%v\n",
-				indent,
-				color.YellowString("Key:"),
-				node.Key,
-				color.YellowString("Value:"),
-				node.Value)
-
-			if node.Value != nil {
-				if node.Value.Node != nil {
-					print(node.Value.Node, level+1)
-				}
-				if len(node.Value.Array) > 0 {
-					for _, v := range node.Value.Array {
-						if v.Node != nil {
-							print(v.Node, level+1)
-						}
+			// Check array items
+			if node.Value.Type == TypeArray {
+				for _, item := range node.Value.Array {
+					if item != nil && item.Node != nil {
+						search(item.Node)
 					}
 				}
 			}
-			node = node.Next
+		}
+
+		// Check next sibling
+		if node.Next != nil {
+			search(node.Next)
 		}
 	}
-	print(n.Reset(), 0)
+
+	// Start search from root
+	search(n)
+	return nodes
 }
