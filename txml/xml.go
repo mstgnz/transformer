@@ -5,10 +5,28 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/mstgnz/transformer/node"
 )
+
+// IsXml checks if the given data is valid XML
+func IsXml(data []byte) bool {
+	return xml.Unmarshal(data, new(any)) == nil
+}
+
+// ReadXml reads XML data from a file
+func ReadXml(filename string) ([]byte, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	if !IsXml(data) {
+		return nil, fmt.Errorf("invalid XML format")
+	}
+	return data, nil
+}
 
 // DecodeXml decodes XML bytes into a Node
 func DecodeXml(data []byte) (*node.Node, error) {
@@ -44,7 +62,6 @@ func DecodeXml(data []byte) (*node.Node, error) {
 
 			// Handle attributes
 			if len(t.Attr) > 0 {
-				n.Value.Type = node.TypeObject
 				for _, attr := range t.Attr {
 					attrNode := &node.Node{
 						Key: attr.Name.Local,
@@ -109,10 +126,10 @@ func NodeToXml(n *node.Node) ([]byte, error) {
 	buf.WriteString(xml.Header)
 
 	if n.Key == "root" && n.Value.Type == node.TypeObject {
+		// Write root attributes first
 		buf.WriteString("<root")
-
-		// Write root attributes
 		current := n.Value.Node
+		hasAttributes := false
 		for current != nil {
 			if current.Value != nil && current.Value.Type == node.TypeString {
 				buf.WriteByte(' ')
@@ -120,23 +137,45 @@ func NodeToXml(n *node.Node) ([]byte, error) {
 				buf.WriteString("=\"")
 				buf.WriteString(escapeXml(current.Value.Worth))
 				buf.WriteByte('"')
+				hasAttributes = true
 			}
 			current = current.Next
 		}
 
-		buf.WriteByte('>')
-
-		// Write root children
+		// Write non-attribute children
+		hasChildren := false
 		current = n.Value.Node
 		for current != nil {
 			if current.Value != nil && current.Value.Type != node.TypeString {
-				if err := writeNode(&buf, current, 0); err != nil {
+				hasChildren = true
+				break
+			}
+			current = current.Next
+		}
+
+		if !hasChildren {
+			if hasAttributes {
+				buf.WriteString("/>")
+			} else {
+				buf.WriteString("></root>")
+			}
+			return buf.Bytes(), nil
+		}
+
+		buf.WriteByte('>')
+		buf.WriteByte('\n')
+
+		current = n.Value.Node
+		for current != nil {
+			if current.Value != nil && current.Value.Type != node.TypeString {
+				if err := writeNode(&buf, current, 2); err != nil {
 					return nil, err
 				}
 			}
 			current = current.Next
 		}
 
+		writeIndent(&buf, 0)
 		buf.WriteString("</root>")
 		return buf.Bytes(), nil
 	}
@@ -158,6 +197,7 @@ func writeNode(buf *bytes.Buffer, n *node.Node, indent int) error {
 	case node.TypeObject:
 		// Write attributes first
 		current := n.Value.Node
+		hasAttributes := false
 		for current != nil {
 			if current.Value != nil && current.Value.Type == node.TypeString {
 				buf.WriteByte(' ')
@@ -165,6 +205,7 @@ func writeNode(buf *bytes.Buffer, n *node.Node, indent int) error {
 				buf.WriteString("=\"")
 				buf.WriteString(escapeXml(current.Value.Worth))
 				buf.WriteByte('"')
+				hasAttributes = true
 			}
 			current = current.Next
 		}
@@ -181,7 +222,13 @@ func writeNode(buf *bytes.Buffer, n *node.Node, indent int) error {
 		}
 
 		if !hasChildren {
-			buf.WriteString("/>")
+			if hasAttributes {
+				buf.WriteString("/>")
+			} else {
+				buf.WriteString("></")
+				buf.WriteString(n.Key)
+				buf.WriteByte('>')
+			}
 			buf.WriteByte('\n')
 			return nil
 		}
