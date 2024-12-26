@@ -30,7 +30,7 @@ func ReadJson(filename string) ([]byte, error) {
 
 // DecodeJson decodes JSON bytes into a Node
 func DecodeJson(data []byte) (*node.Node, error) {
-	var jsonData interface{}
+	var jsonData any
 	if err := json.Unmarshal(data, &jsonData); err != nil {
 		return nil, err
 	}
@@ -38,8 +38,8 @@ func DecodeJson(data []byte) (*node.Node, error) {
 	return interfaceToNode("root", jsonData), nil
 }
 
-// interfaceToNode converts an interface{} to a Node
-func interfaceToNode(key string, data interface{}) *node.Node {
+// interfaceToNode converts an any to a Node
+func interfaceToNode(key string, data any) *node.Node {
 	if data == nil {
 		return &node.Node{
 			Key: key,
@@ -50,7 +50,7 @@ func interfaceToNode(key string, data interface{}) *node.Node {
 	}
 
 	switch v := data.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		n := &node.Node{
 			Key: key,
 			Value: &node.Value{
@@ -74,7 +74,7 @@ func interfaceToNode(key string, data interface{}) *node.Node {
 		}
 		return n
 
-	case []interface{}:
+	case []any:
 		n := &node.Node{
 			Key: key,
 			Value: &node.Value{
@@ -90,7 +90,7 @@ func interfaceToNode(key string, data interface{}) *node.Node {
 			}
 
 			switch val := item.(type) {
-			case map[string]interface{}:
+			case map[string]any:
 				child := interfaceToNode(fmt.Sprintf("item%d", i), val)
 				if child != nil {
 					n.Value.Array[i] = &node.Value{
@@ -98,7 +98,7 @@ func interfaceToNode(key string, data interface{}) *node.Node {
 						Node: child,
 					}
 				}
-			case []interface{}:
+			case []any:
 				child := interfaceToNode(fmt.Sprintf("item%d", i), val)
 				if child != nil {
 					n.Value.Array[i] = child.Value
@@ -147,8 +147,8 @@ func interfaceToNode(key string, data interface{}) *node.Node {
 	}
 }
 
-// valueFromInterface creates a Value from an interface{}
-func valueFromInterface(data interface{}) *node.Value {
+// valueFromInterface creates a Value from an any
+func valueFromInterface(data any) *node.Value {
 	if data == nil {
 		return &node.Value{Type: node.TypeNull}
 	}
@@ -191,8 +191,8 @@ func NodeToJson(n *node.Node) ([]byte, error) {
 	return json.Marshal(data)
 }
 
-// nodeToInterface converts a Node to a generic interface{}
-func nodeToInterface(n *node.Node) interface{} {
+// nodeToInterface converts a Node to a generic any
+func nodeToInterface(n *node.Node) any {
 	if n == nil || n.Value == nil {
 		return nil
 	}
@@ -200,7 +200,7 @@ func nodeToInterface(n *node.Node) interface{} {
 	if n.Key == "root" {
 		switch n.Value.Type {
 		case node.TypeObject:
-			result := make(map[string]interface{})
+			result := make(map[string]any)
 			current := n.Value.Node
 			for current != nil {
 				if current.Value != nil {
@@ -215,7 +215,7 @@ func nodeToInterface(n *node.Node) interface{} {
 			return result
 
 		case node.TypeArray:
-			result := make([]interface{}, 0)
+			result := make([]any, 0)
 			for _, item := range n.Value.Array {
 				if item != nil {
 					if item.Node != nil {
@@ -234,7 +234,7 @@ func nodeToInterface(n *node.Node) interface{} {
 
 	switch n.Value.Type {
 	case node.TypeObject:
-		result := make(map[string]interface{})
+		result := make(map[string]any)
 		current := n.Value.Node
 		for current != nil {
 			if current.Value != nil {
@@ -249,7 +249,7 @@ func nodeToInterface(n *node.Node) interface{} {
 		return result
 
 	case node.TypeArray:
-		result := make([]interface{}, 0)
+		result := make([]any, 0)
 		for _, item := range n.Value.Array {
 			if item != nil {
 				if item.Node != nil {
@@ -266,8 +266,8 @@ func nodeToInterface(n *node.Node) interface{} {
 	}
 }
 
-// convertValue converts a Value to a suitable interface{} type
-func convertValue(v *node.Value) interface{} {
+// convertValue converts a Value to a suitable any type
+func convertValue(v *node.Value) any {
 	if v == nil {
 		return nil
 	}
