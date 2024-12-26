@@ -5,7 +5,6 @@ package tyaml
 import (
 	"fmt"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -366,34 +365,22 @@ func nodeToMap(n *node.Node) map[string]any {
 	result := make(map[string]any)
 	current := n
 
-	// Collect all nodes into a slice for sorting
-	nodes := make([]*node.Node, 0)
 	for current != nil {
-		nodes = append(nodes, current)
+		if current.Value != nil {
+			switch current.Value.Type {
+			case node.TypeArray:
+				result[current.Key] = convertValue(current.Value)
+			case node.TypeObject:
+				if current.Value.Node != nil {
+					result[current.Key] = nodeToMap(current.Value.Node)
+				} else {
+					result[current.Key] = make(map[string]any)
+				}
+			default:
+				result[current.Key] = convertValue(current.Value)
+			}
+		}
 		current = current.Next
-	}
-
-	// Sort nodes by key with special handling for test cases
-	sort.Slice(nodes, func(i, j int) bool {
-		// Special case for test case with number, boolean, null
-		if nodes[i].Key == "number" {
-			return true
-		}
-		if nodes[j].Key == "number" {
-			return false
-		}
-		if nodes[i].Key == "boolean" {
-			return true
-		}
-		if nodes[j].Key == "boolean" {
-			return false
-		}
-		return nodes[i].Key < nodes[j].Key
-	})
-
-	// Convert sorted nodes to map entries
-	for _, node := range nodes {
-		result[node.Key] = convertValue(node.Value)
 	}
 
 	return result
@@ -425,9 +412,22 @@ func convertValue(v *node.Value) any {
 		b, _ := strconv.ParseBool(v.Worth)
 		return b
 	case node.TypeArray:
-		result := make([]any, len(v.Array))
-		for i, item := range v.Array {
-			result[i] = convertValue(item)
+		result := make([]any, 0)
+		for _, item := range v.Array {
+			if item != nil {
+				switch item.Type {
+				case node.TypeObject:
+					if item.Node != nil {
+						if item.Node.Value != nil {
+							result = append(result, convertValue(item.Node.Value))
+						} else {
+							result = append(result, item.Worth)
+						}
+					}
+				default:
+					result = append(result, item.Worth)
+				}
+			}
 		}
 		return result
 	case node.TypeObject:
