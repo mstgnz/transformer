@@ -147,18 +147,9 @@ Node yapısı aşağıdaki veri tiplerini destekler:
 
 ## Katkıda Bulunma
 
-1. Bu repository'yi fork edin
-2. Yeni bir branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Değişikliklerinizi commit edin (`git commit -m 'feat: add amazing feature'`)
-4. Branch'inizi push edin (`git push origin feature/amazing-feature`)
-5. Pull Request oluşturun
+Bu proje açık kaynaklıdır ve katkılara açıktır. Her türlü katkıda bulunmaktan veya geri bildirimde bulunmaktan çekinmeyin.
+
 
 ## Lisans
 
 Bu proje Apache License, Version 2.0 altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
-
-## İletişim
-
-Mesut GENEZ - [@mstgnz](https://github.com/mstgnz)
-
-Proje Linki: [https://github.com/mstgnz/transformer](https://github.com/mstgnz/transformer)

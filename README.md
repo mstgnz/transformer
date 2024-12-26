@@ -147,18 +147,9 @@ The Node structure supports the following data types:
 
 ## Contributing
 
-1. Fork this repository
-2. Create a new branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Create a Pull Request
+This project is open-source, and contributions are welcome. Feel free to contribute or provide feedback of any kind.
+
 
 ## License
 
 This project is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for details.
-
-## Contact
-
-Mesut GENEZ - [@mstgnz](https://github.com/mstgnz)
-
-Project Link: [https://github.com/mstgnz/transformer](https://github.com/mstgnz/transformer)
