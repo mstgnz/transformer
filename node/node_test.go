@@ -860,3 +860,460 @@ func TestNode_Print(t *testing.T) {
 		})
 	}
 }
+
+func TestNode_AddToNext(t *testing.T) {
+	tests := []struct {
+		name    string
+		node    *Node
+		next    *Node
+		wantErr bool
+	}{
+		{
+			name: "Add next to node",
+			node: &Node{
+				Key: "first",
+				Value: &Value{
+					Type:  TypeString,
+					Worth: "first value",
+				},
+			},
+			next: &Node{
+				Key: "second",
+				Value: &Value{
+					Type:  TypeString,
+					Worth: "second value",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Add next to nil node",
+			node: nil,
+			next: &Node{
+				Key: "second",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Add nil next",
+			node: &Node{
+				Key: "first",
+			},
+			next:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.node.AddToNext(tt.next)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("AddToNext() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && tt.node.Next != tt.next {
+				t.Error("AddToNext() did not set Next correctly")
+			}
+			if !tt.wantErr && tt.next.Prev != tt.node {
+				t.Error("AddToNext() did not set Prev correctly")
+			}
+		})
+	}
+}
+
+func TestNode_AddToPrev(t *testing.T) {
+	tests := []struct {
+		name    string
+		node    *Node
+		prev    *Node
+		wantErr bool
+	}{
+		{
+			name: "Add prev to node",
+			node: &Node{
+				Key: "second",
+				Value: &Value{
+					Type:  TypeString,
+					Worth: "second value",
+				},
+			},
+			prev: &Node{
+				Key: "first",
+				Value: &Value{
+					Type:  TypeString,
+					Worth: "first value",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Add prev to nil node",
+			node: nil,
+			prev: &Node{
+				Key: "first",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Add nil prev",
+			node: &Node{
+				Key: "second",
+			},
+			prev:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.node.AddToPrev(tt.prev)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("AddToPrev() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && tt.node.Prev != tt.prev {
+				t.Error("AddToPrev() did not set Prev correctly")
+			}
+			if !tt.wantErr && tt.prev.Next != tt.node {
+				t.Error("AddToPrev() did not set Next correctly")
+			}
+		})
+	}
+}
+
+func TestNode_Exists(t *testing.T) {
+	tests := []struct {
+		name string
+		node *Node
+		key  string
+		want bool
+	}{
+		{
+			name: "Key exists in direct children",
+			node: &Node{
+				Key: "root",
+				Value: &Value{
+					Type: TypeObject,
+					Node: &Node{
+						Key: "child",
+					},
+				},
+			},
+			key:  "child",
+			want: true,
+		},
+		{
+			name: "Key exists in nested children",
+			node: &Node{
+				Key: "root",
+				Value: &Value{
+					Type: TypeObject,
+					Node: &Node{
+						Key: "parent",
+						Value: &Value{
+							Type: TypeObject,
+							Node: &Node{
+								Key: "child",
+							},
+						},
+					},
+				},
+			},
+			key:  "child",
+			want: true,
+		},
+		{
+			name: "Key does not exist",
+			node: &Node{
+				Key: "root",
+				Value: &Value{
+					Type: TypeObject,
+					Node: &Node{
+						Key: "other",
+					},
+				},
+			},
+			key:  "nonexistent",
+			want: false,
+		},
+		{
+			name: "Nil node",
+			node: nil,
+			key:  "any",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.node.Exists(tt.key); got != tt.want {
+				t.Errorf("Exists() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNode_Clone(t *testing.T) {
+	tests := []struct {
+		name string
+		node *Node
+	}{
+		{
+			name: "Clone simple node",
+			node: &Node{
+				Key: "simple",
+				Value: &Value{
+					Type:  TypeString,
+					Worth: "value",
+				},
+			},
+		},
+		{
+			name: "Clone object node",
+			node: &Node{
+				Key: "object",
+				Value: &Value{
+					Type: TypeObject,
+					Node: &Node{
+						Key: "child",
+						Value: &Value{
+							Type:  TypeString,
+							Worth: "value",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Clone array node",
+			node: &Node{
+				Key: "array",
+				Value: &Value{
+					Type: TypeArray,
+					Array: []*Value{
+						{
+							Type:  TypeString,
+							Worth: "item1",
+						},
+						{
+							Type:  TypeString,
+							Worth: "item2",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Clone nil node",
+			node: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cloned := tt.node.Clone()
+			if tt.node == nil {
+				if cloned != nil {
+					t.Error("Clone() of nil node should return nil")
+				}
+				return
+			}
+			if !cloned.Equal(tt.node) {
+				t.Error("Clone() result is not equal to original")
+			}
+			if cloned == tt.node {
+				t.Error("Clone() returned same instance instead of copy")
+			}
+		})
+	}
+}
+
+func TestNode_Equal(t *testing.T) {
+	tests := []struct {
+		name  string
+		node  *Node
+		other *Node
+		want  bool
+	}{
+		{
+			name: "Equal simple nodes",
+			node: &Node{
+				Key: "key",
+				Value: &Value{
+					Type:  TypeString,
+					Worth: "value",
+				},
+			},
+			other: &Node{
+				Key: "key",
+				Value: &Value{
+					Type:  TypeString,
+					Worth: "value",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "Different keys",
+			node: &Node{
+				Key: "key1",
+				Value: &Value{
+					Type:  TypeString,
+					Worth: "value",
+				},
+			},
+			other: &Node{
+				Key: "key2",
+				Value: &Value{
+					Type:  TypeString,
+					Worth: "value",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "Different values",
+			node: &Node{
+				Key: "key",
+				Value: &Value{
+					Type:  TypeString,
+					Worth: "value1",
+				},
+			},
+			other: &Node{
+				Key: "key",
+				Value: &Value{
+					Type:  TypeString,
+					Worth: "value2",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "One nil node",
+			node: &Node{
+				Key: "key",
+			},
+			other: nil,
+			want:  false,
+		},
+		{
+			name:  "Both nil nodes",
+			node:  nil,
+			other: nil,
+			want:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.node.Equal(tt.other); got != tt.want {
+				t.Errorf("Equal() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNode_String(t *testing.T) {
+	tests := []struct {
+		name string
+		node *Node
+		want string
+	}{
+		{
+			name: "String simple node",
+			node: &Node{
+				Key: "key",
+				Value: &Value{
+					Type:  TypeString,
+					Worth: "value",
+				},
+			},
+			want: "key: value",
+		},
+		{
+			name: "String object node",
+			node: &Node{
+				Key: "object",
+				Value: &Value{
+					Type: TypeObject,
+					Node: &Node{
+						Key: "child",
+						Value: &Value{
+							Type:  TypeString,
+							Worth: "value",
+						},
+					},
+				},
+			},
+			want: "object: {child: value}",
+		},
+		{
+			name: "String nil node",
+			node: nil,
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.node.String(); got != tt.want {
+				t.Errorf("String() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNode_Type(t *testing.T) {
+	tests := []struct {
+		name string
+		node *Node
+		want ValueType
+	}{
+		{
+			name: "String type",
+			node: &Node{
+				Value: &Value{
+					Type: TypeString,
+				},
+			},
+			want: TypeString,
+		},
+		{
+			name: "Object type",
+			node: &Node{
+				Value: &Value{
+					Type: TypeObject,
+				},
+			},
+			want: TypeObject,
+		},
+		{
+			name: "Array type",
+			node: &Node{
+				Value: &Value{
+					Type: TypeArray,
+				},
+			},
+			want: TypeArray,
+		},
+		{
+			name: "Nil node",
+			node: nil,
+			want: TypeNull,
+		},
+		{
+			name: "Node with nil value",
+			node: &Node{},
+			want: TypeNull,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.node.Type(); got != tt.want {
+				t.Errorf("Type() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

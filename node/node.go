@@ -486,3 +486,191 @@ func (n *Node) FindNodes(predicate func(*Node) bool) []*Node {
 	search(n)
 	return nodes
 }
+
+// AddToNext adds a node as the next node
+func (n *Node) AddToNext(next *Node) error {
+	if n == nil {
+		return fmt.Errorf("node is nil")
+	}
+	if next == nil {
+		return fmt.Errorf("next node is nil")
+	}
+	n.Next = next
+	next.Prev = n
+	return nil
+}
+
+// AddToPrev adds a node as the previous node
+func (n *Node) AddToPrev(prev *Node) error {
+	if n == nil {
+		return fmt.Errorf("node is nil")
+	}
+	if prev == nil {
+		return fmt.Errorf("previous node is nil")
+	}
+	n.Prev = prev
+	prev.Next = n
+	return nil
+}
+
+// Exists checks if a node with the given key exists in the tree
+func (n *Node) Exists(key string) bool {
+	if n == nil {
+		return false
+	}
+	if n.Key == key {
+		return true
+	}
+	if n.Value != nil && n.Value.Type == TypeObject && n.Value.Node != nil {
+		current := n.Value.Node
+		for current != nil {
+			if current.Exists(key) {
+				return true
+			}
+			current = current.Next
+		}
+	}
+	return false
+}
+
+// Clone creates a deep copy of the node
+func (n *Node) Clone() *Node {
+	if n == nil {
+		return nil
+	}
+	clone := &Node{
+		Key: n.Key,
+	}
+	if n.Value != nil {
+		clone.Value = &Value{
+			Type:  n.Value.Type,
+			Worth: n.Value.Worth,
+		}
+		if n.Value.Node != nil {
+			clone.Value.Node = n.Value.Node.Clone()
+		}
+		if n.Value.Array != nil {
+			clone.Value.Array = make([]*Value, len(n.Value.Array))
+			for i, v := range n.Value.Array {
+				if v != nil {
+					clone.Value.Array[i] = &Value{
+						Type:  v.Type,
+						Worth: v.Worth,
+					}
+					if v.Node != nil {
+						clone.Value.Array[i].Node = v.Node.Clone()
+					}
+				}
+			}
+		}
+	}
+	if n.Next != nil {
+		clone.Next = n.Next.Clone()
+		clone.Next.Prev = clone
+	}
+	return clone
+}
+
+// Equal checks if two nodes are equal
+func (n *Node) Equal(other *Node) bool {
+	if n == nil && other == nil {
+		return true
+	}
+	if n == nil || other == nil {
+		return false
+	}
+	if n.Key != other.Key {
+		return false
+	}
+	if n.Value == nil && other.Value == nil {
+		return true
+	}
+	if n.Value == nil || other.Value == nil {
+		return false
+	}
+	if n.Value.Type != other.Value.Type {
+		return false
+	}
+	if n.Value.Worth != other.Value.Worth {
+		return false
+	}
+	if n.Value.Node != nil {
+		if !n.Value.Node.Equal(other.Value.Node) {
+			return false
+		}
+	}
+	if n.Value.Array != nil {
+		if len(n.Value.Array) != len(other.Value.Array) {
+			return false
+		}
+		for i := range n.Value.Array {
+			if n.Value.Array[i] == nil && other.Value.Array[i] == nil {
+				continue
+			}
+			if n.Value.Array[i] == nil || other.Value.Array[i] == nil {
+				return false
+			}
+			if n.Value.Array[i].Type != other.Value.Array[i].Type {
+				return false
+			}
+			if n.Value.Array[i].Worth != other.Value.Array[i].Worth {
+				return false
+			}
+			if n.Value.Array[i].Node != nil {
+				if !n.Value.Array[i].Node.Equal(other.Value.Array[i].Node) {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// String returns a string representation of the node
+func (n *Node) String() string {
+	if n == nil {
+		return ""
+	}
+	if n.Value == nil {
+		return n.Key
+	}
+	switch n.Value.Type {
+	case TypeString:
+		return fmt.Sprintf("%s: %v", n.Key, n.Value.Worth)
+	case TypeObject:
+		var b strings.Builder
+		b.WriteString(n.Key)
+		b.WriteString(": {")
+		if n.Value.Node != nil {
+			b.WriteString(n.Value.Node.String())
+		}
+		b.WriteByte('}')
+		return b.String()
+	case TypeArray:
+		var b strings.Builder
+		b.WriteString(n.Key)
+		b.WriteString(": [")
+		for i, v := range n.Value.Array {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			if v != nil && v.Node != nil {
+				b.WriteString(v.Node.String())
+			} else if v != nil {
+				b.WriteString(fmt.Sprintf("%v", v.Worth))
+			}
+		}
+		b.WriteByte(']')
+		return b.String()
+	default:
+		return fmt.Sprintf("%s: %v", n.Key, n.Value.Worth)
+	}
+}
+
+// Type returns the type of the node's value
+func (n *Node) Type() ValueType {
+	if n == nil || n.Value == nil {
+		return TypeNull
+	}
+	return n.Value.Type
+}
