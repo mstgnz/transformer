@@ -60,12 +60,12 @@ func init() {
 		panic(err)
 	}
 
-	// Büyük veri setini doldur
+	// Fill the big data set
 	for i := 0; i < len(largeTestData.Items); i++ {
 		largeTestData.Items[i] = Item{
 			ID:          i,
 			Name:        "Item " + string(rune(i)),
-			Description: "Bu bir test açıklamasıdır " + string(rune(i)),
+			Description: "This is a test description " + string(rune(i)),
 			Tags:        []string{"tag1", "tag2", "tag3"},
 		}
 	}
