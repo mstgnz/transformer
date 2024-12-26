@@ -10,28 +10,33 @@ import (
 )
 
 func TestIsYml(t *testing.T) {
+	validYaml, err := os.ReadFile("../example/files/valid.yaml")
+	if err != nil {
+		t.Fatalf("Error reading valid.yaml: %v", err)
+	}
+
+	invalidYaml, err := os.ReadFile("../example/files/invalid.yaml")
+	if err != nil {
+		t.Fatalf("Error reading invalid.yaml: %v", err)
+	}
+
 	tests := []struct {
 		name string
 		data []byte
 		want bool
 	}{
 		{
-			name: "Valid YAML object",
-			data: []byte("key: value"),
+			name: "valid yaml",
+			data: validYaml,
 			want: true,
 		},
 		{
-			name: "Valid YAML array",
-			data: []byte("- 1\n- 2\n- 3"),
-			want: true,
-		},
-		{
-			name: "Invalid YAML",
-			data: []byte("key: : value"),
+			name: "invalid yaml",
+			data: invalidYaml,
 			want: false,
 		},
 		{
-			name: "Empty input",
+			name: "empty yaml",
 			data: []byte{},
 			want: false,
 		},
