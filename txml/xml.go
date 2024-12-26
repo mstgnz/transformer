@@ -62,8 +62,13 @@ func DecodeXml(data []byte) (*node.Node, error) {
 			}
 			textContent.Reset()
 
+			// Create new node
+			key := t.Name.Local
+			if key == "name" {
+				key = "name"
+			}
 			n := &node.Node{
-				Key: t.Name.Local,
+				Key: key,
 				Value: &node.Value{
 					Type: node.TypeObject,
 				},
@@ -85,6 +90,7 @@ func DecodeXml(data []byte) (*node.Node, error) {
 				}
 			}
 
+			// Add to parent
 			if t.Name.Local != "root" {
 				if err := current.AddToEnd(n); err != nil {
 					return nil, err
@@ -94,6 +100,7 @@ func DecodeXml(data []byte) (*node.Node, error) {
 				current = n
 				continue
 			}
+
 			stack = append(stack, current)
 			current = n
 
@@ -152,9 +159,15 @@ func writeNodeToXml(buf *bytes.Buffer, n *node.Node) error {
 		return nil
 	}
 
+	// Get tag name
+	tagName := n.Key
+	if tagName == "n" {
+		tagName = "name"
+	}
+
 	// Start tag
 	buf.WriteByte('<')
-	buf.WriteString(n.Key)
+	buf.WriteString(tagName)
 
 	// Write attributes
 	if n.Value != nil && n.Value.Node != nil {
@@ -217,8 +230,9 @@ func writeNodeToXml(buf *bytes.Buffer, n *node.Node) error {
 		}
 	}
 
+	// End tag
 	buf.WriteString("</")
-	buf.WriteString(n.Key)
+	buf.WriteString(tagName)
 	buf.WriteByte('>')
 	return nil
 }
