@@ -1,0 +1,54 @@
+StartElement root [] 				        - 1.node, set Key and Value.Attr
+    CharData 							    - 2.node=1.node.Value.Node if CharData is null, this is child node
+    StartElement apiVersion []			    - 2.node.Parent=1.node, 2.node set Key and Value.Attr
+        CharData v1							- 2.node set Value.Worth
+    EndElement apiVersion				    - 2.node.Next=3.node
+    StartElement kind []				    - 3.node.Prev=2.node, 3.node.Parent=2.node.Parent, 3.node set Key and Value.Attr
+        CharData Pod						- 3.node set Value.Worth
+    EndElement kind						    - 3.node.Next=4.node
+    StartElement thing [{{ prop} 2} {{ version} 4.5}] - 4.node.Prev=3.node, 4.node.Parent=3.node.Parent
+        CharData 4.56						- 4.node set Value.Worth
+    EndElement thing					    - 4.node.Next=5.node
+    StartElement metadata []			    - 5.node.Prev=4.node, 5.node.Parent=4.node.Parent
+        CharData							- 6.node=5.node.Value.Node if CharData is null, this is child node
+        StartElement name []				- 6.Node.Parent=5.node, 6.node set Key and Value.Attr
+            CharData rss-site				- 6.node set Value.Attr
+        EndElement name						- 6.node.Next=7.node
+        StartElement labels []				- 7.node.Prev=6.node, 7.node.Parent=6.node.Parent
+            CharData						- 8.node=7.node.Value.Node if CharData is null, this is child node
+            StartElement app []             - 8.node.Parent=7.node
+                CharData web                - 8.node.Value.Worth=web
+            EndElement app                  - 
+        EndElement labels                   -
+    EndElement metadata                     - 5.node.Next=9.node
+    StartElement spec []                    - 9.node.Prev=5.node
+        CharData                            - 10.node=9.node.Value.Node
+        StartElement containers []          - 10.node.Parent=9.node
+            CharData                        - 11.node=10.node.Value.Node
+            StartElement name []            - 11.node.Parent=10.node
+                CharData front-end          - 11.node.Value.Worth
+            EndElement name                 - 11.node.Next=12.node
+            StartElement image []           - 12.node.Parent=11.node.Parent, 12.node.Prev=11.Node
+                CharData nginx              - 12.node.Value.Worth
+            EndElement image                - 12.node.Next=13.node
+            StartElement ports []           - 13.node.Parent=12.node.Parent, 13.node.Prev=12.node
+                CharData                    - 14.node=13.node.Value.Node
+                StartElement containerPort [] - 14.node.Parent=13.node
+                    CharData 80             - 14.node.Value.Worth
+                EndElement containerPort    - 14.node.Next=15.node
+                StartElement port [{{ port} 34}] - 15.node.Parent=14.node.Parent, 14.node.Prev=15.node
+                    CharData 34             - 15.node.Value.Worth
+                EndElement port             - 15.node.Next=16.node
+                StartElement port []        - 16.node.Parent=15.node.Parent, 16.node.Prev=15.node
+                    CharData 55             - 16.node.Value.Worth
+                EndElement port             - 16.node.Next=17.node
+                StartElement status [{{ status} on}] - 17.node.Parent=16.node.Parent, 17.node.Prev=16.node
+                    CharData on             - 17.node.Value.Worth
+                EndElement status           - 17.node.Next=18.node
+                StartElement status []      - 18.node.Parent=17.node.Parent, 18.node.Prev=17.node
+                    CharData off            - 18.node.Value.Worth
+                EndElement status           -
+            EndElement ports                -
+        EndElement containers               -
+    EndElement spec                         -
+EndElement root                             -
