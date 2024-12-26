@@ -40,7 +40,7 @@ func DecodeXml(data []byte) (*node.Node, error) {
 
 	var current *node.Node = root
 	var stack []*node.Node
-	var textContent string
+	var textContent strings.Builder
 
 	for {
 		token, err := decoder.Token()
@@ -53,6 +53,7 @@ func DecodeXml(data []byte) (*node.Node, error) {
 
 		switch t := token.(type) {
 		case xml.StartElement:
+			// Create new node
 			n := &node.Node{
 				Key: t.Name.Local,
 				Value: &node.Value{
@@ -63,15 +64,30 @@ func DecodeXml(data []byte) (*node.Node, error) {
 			// Handle attributes
 			if len(t.Attr) > 0 {
 				for _, attr := range t.Attr {
-					attrNode := &node.Node{
-						Key: attr.Name.Local,
-						Value: &node.Value{
-							Type:  node.TypeString,
-							Worth: attr.Value,
-						},
-					}
-					if err := n.AddToEnd(attrNode); err != nil {
-						return nil, err
+					if current == root && n.Key == "root" {
+						// Root attributes are added directly to root node
+						attrNode := &node.Node{
+							Key: attr.Name.Local,
+							Value: &node.Value{
+								Type:  node.TypeString,
+								Worth: attr.Value,
+							},
+						}
+						if err := root.AddToEnd(attrNode); err != nil {
+							return nil, err
+						}
+					} else {
+						// Non-root attributes are added to the current node
+						attrNode := &node.Node{
+							Key: attr.Name.Local,
+							Value: &node.Value{
+								Type:  node.TypeString,
+								Worth: attr.Value,
+							},
+						}
+						if err := n.AddToEnd(attrNode); err != nil {
+							return nil, err
+						}
 					}
 				}
 			}
@@ -82,17 +98,14 @@ func DecodeXml(data []byte) (*node.Node, error) {
 
 			stack = append(stack, current)
 			current = n
+			textContent.Reset()
 
 		case xml.EndElement:
-			if textContent != "" {
+			text := strings.TrimSpace(textContent.String())
+			if text != "" && current != nil && current != root {
 				current.Value = &node.Value{
 					Type:  node.TypeString,
-					Worth: textContent,
-				}
-				textContent = ""
-			} else if current.Value.Type == node.TypeObject && current.Value.Node == nil {
-				current.Value = &node.Value{
-					Type: node.TypeNull,
+					Worth: text,
 				}
 			}
 
@@ -100,11 +113,12 @@ func DecodeXml(data []byte) (*node.Node, error) {
 				current = stack[len(stack)-1]
 				stack = stack[:len(stack)-1]
 			}
+			textContent.Reset()
 
 		case xml.CharData:
-			text := strings.TrimSpace(string(t))
-			if text != "" {
-				textContent = text
+			text := string(t)
+			if strings.TrimSpace(text) != "" {
+				textContent.WriteString(text)
 			}
 		}
 	}
@@ -125,79 +139,73 @@ func NodeToXml(n *node.Node) ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteString(xml.Header)
 
-	if n.Key == "root" && n.Value.Type == node.TypeObject {
-		// Write root attributes first
-		buf.WriteString("<root")
-		current := n.Value.Node
-		hasAttributes := false
-		for current != nil {
-			if current.Value != nil && current.Value.Type == node.TypeString {
-				buf.WriteByte(' ')
-				buf.WriteString(current.Key)
-				buf.WriteString("=\"")
-				buf.WriteString(escapeXml(current.Value.Worth))
-				buf.WriteByte('"')
-				hasAttributes = true
-			}
-			current = current.Next
-		}
-
-		// Write non-attribute children
-		hasChildren := false
-		current = n.Value.Node
-		for current != nil {
-			if current.Value != nil && current.Value.Type != node.TypeString {
-				hasChildren = true
-				break
-			}
-			current = current.Next
-		}
-
-		if !hasChildren {
-			if hasAttributes {
-				buf.WriteString("/>")
-			} else {
-				buf.WriteString("></root>")
-			}
-			return buf.Bytes(), nil
-		}
-
-		buf.WriteByte('>')
-		buf.WriteByte('\n')
-
-		current = n.Value.Node
-		for current != nil {
-			if current.Value != nil && current.Value.Type != node.TypeString {
-				if err := writeNode(&buf, current, 2); err != nil {
-					return nil, err
-				}
-			}
-			current = current.Next
-		}
-
-		writeIndent(&buf, 0)
-		buf.WriteString("</root>")
-		return buf.Bytes(), nil
+	if err := writeNode(&buf, n); err != nil {
+		return nil, err
 	}
 
-	return nil, fmt.Errorf("root node must be an object")
+	return buf.Bytes(), nil
 }
 
-// writeNode writes a Node to the buffer with proper indentation
-func writeNode(buf *bytes.Buffer, n *node.Node, indent int) error {
+// writeNode writes a Node to the buffer
+func writeNode(buf *bytes.Buffer, n *node.Node) error {
 	if n == nil || n.Value == nil {
 		return nil
 	}
 
-	writeIndent(buf, indent)
+	// Handle root node
+	if n.Key == "root" {
+		buf.WriteString("<root")
+
+		// Write root attributes
+		if n.Value.Type == node.TypeObject && n.Value.Node != nil {
+			current := n.Value.Node
+			for current != nil {
+				if current.Value != nil && current.Value.Type == node.TypeString {
+					buf.WriteByte(' ')
+					buf.WriteString(current.Key)
+					buf.WriteString("=\"")
+					buf.WriteString(escapeXml(current.Value.Worth))
+					buf.WriteByte('"')
+				}
+				current = current.Next
+			}
+		}
+
+		buf.WriteByte('>')
+
+		// Write child nodes
+		if n.Value.Type == node.TypeObject && n.Value.Node != nil {
+			current := n.Value.Node
+			for current != nil {
+				if current.Value != nil && current.Value.Type != node.TypeString {
+					if err := writeChildNode(buf, current); err != nil {
+						return err
+					}
+				}
+				current = current.Next
+			}
+		}
+
+		buf.WriteString("</root>")
+		return nil
+	}
+
+	return writeChildNode(buf, n)
+}
+
+// writeChildNode writes a non-root node to the buffer
+func writeChildNode(buf *bytes.Buffer, n *node.Node) error {
+	if n == nil || n.Value == nil {
+		return nil
+	}
+
+	// Start tag
 	buf.WriteByte('<')
 	buf.WriteString(n.Key)
 
-	switch n.Value.Type {
-	case node.TypeObject:
-		// Write attributes first
+	// Write attributes
+	if n.Value.Type == node.TypeObject && n.Value.Node != nil {
 		current := n.Value.Node
-		hasAttributes := false
 		for current != nil {
 			if current.Value != nil && current.Value.Type == node.TypeString {
 				buf.WriteByte(' ')
@@ -205,100 +213,52 @@ func writeNode(buf *bytes.Buffer, n *node.Node, indent int) error {
 				buf.WriteString("=\"")
 				buf.WriteString(escapeXml(current.Value.Worth))
 				buf.WriteByte('"')
-				hasAttributes = true
 			}
 			current = current.Next
 		}
+	}
 
-		// Write non-attribute children
-		hasChildren := false
-		current = n.Value.Node
-		for current != nil {
-			if current.Value != nil && current.Value.Type != node.TypeString {
-				hasChildren = true
-				break
-			}
-			current = current.Next
-		}
-
-		if !hasChildren {
-			if hasAttributes {
-				buf.WriteString("/>")
-			} else {
-				buf.WriteString("></")
-				buf.WriteString(n.Key)
-				buf.WriteByte('>')
-			}
-			buf.WriteByte('\n')
-			return nil
-		}
-
-		buf.WriteByte('>')
-		buf.WriteByte('\n')
-
-		current = n.Value.Node
-		for current != nil {
-			if current.Value != nil && current.Value.Type != node.TypeString {
-				if err := writeNode(buf, current, indent+2); err != nil {
-					return err
-				}
-			}
-			current = current.Next
-		}
-
-		writeIndent(buf, indent)
-		buf.WriteString("</")
-		buf.WriteString(n.Key)
-		buf.WriteByte('>')
-		buf.WriteByte('\n')
-
-	case node.TypeArray:
-		buf.WriteByte('>')
-		buf.WriteByte('\n')
-		for _, item := range n.Value.Array {
-			if item == nil {
-				continue
-			}
-			if item.Node != nil {
-				if err := writeNode(buf, item.Node, indent+2); err != nil {
-					return err
-				}
-			} else {
-				writeIndent(buf, indent+2)
-				buf.WriteString(escapeXml(item.Worth))
-				buf.WriteByte('\n')
-			}
-		}
-		writeIndent(buf, indent)
-		buf.WriteString("</")
-		buf.WriteString(n.Key)
-		buf.WriteByte('>')
-		buf.WriteByte('\n')
-
-	case node.TypeString, node.TypeNumber, node.TypeBoolean:
+	// Handle different value types
+	switch n.Value.Type {
+	case node.TypeString:
 		buf.WriteByte('>')
 		buf.WriteString(escapeXml(n.Value.Worth))
 		buf.WriteString("</")
 		buf.WriteString(n.Key)
 		buf.WriteByte('>')
-		buf.WriteByte('\n')
+		return nil
 
-	case node.TypeNull:
-		buf.WriteString("/>")
-		buf.WriteByte('\n')
+	case node.TypeNumber, node.TypeBoolean:
+		buf.WriteByte('>')
+		buf.WriteString(n.Value.Worth)
+		buf.WriteString("</")
+		buf.WriteString(n.Key)
+		buf.WriteByte('>')
+		return nil
 
-	default:
-		return fmt.Errorf("unknown type: %v", n.Value.Type)
+	case node.TypeObject:
+		buf.WriteByte('>')
+
+		// Write child nodes
+		if n.Value.Node != nil {
+			current := n.Value.Node
+			for current != nil {
+				if current.Value != nil && current.Value.Type != node.TypeString {
+					if err := writeChildNode(buf, current); err != nil {
+						return err
+					}
+				}
+				current = current.Next
+			}
+		}
+
+		buf.WriteString("</")
+		buf.WriteString(n.Key)
+		buf.WriteByte('>')
+		return nil
 	}
 
 	return nil
-}
-
-// writeIndent writes indentation spaces
-func writeIndent(buf *bytes.Buffer, n int) {
-	for i := 0; i < n; i++ {
-		buf.WriteByte(' ')
-	}
 }
 
 // escapeXml escapes special XML characters
