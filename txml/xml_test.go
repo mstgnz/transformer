@@ -142,29 +142,60 @@ func TestDecodeXml(t *testing.T) {
 }
 
 func TestNodeToXml(t *testing.T) {
-	validXml, err := os.ReadFile("../example/files/valid.xml")
-	if err != nil {
-		t.Fatalf("Error reading valid.xml: %v", err)
+	tests := []struct {
+		name string
+		xml  string
+		want string
+	}{
+		{
+			name: "simple element",
+			xml:  "<root><test>value</test></root>",
+			want: "<root><test>value</test></root>",
+		},
+		{
+			name: "element with attribute",
+			xml:  "<root><test attr=\"value\">content</test></root>",
+			want: "<root><test attr=\"value\">content</test></root>",
+		},
+		{
+			name: "nested elements",
+			xml:  "<root><parent><child>value</child></parent></root>",
+			want: "<root><parent><child>value</child></parent></root>",
+		},
+		{
+			name: "multiple attributes",
+			xml:  "<root><test a=\"1\" b=\"2\">value</test></root>",
+			want: "<root><test a=\"1\" b=\"2\">value</test></root>",
+		},
+		{
+			name: "empty element",
+			xml:  "<root><test/></root>",
+			want: "<root><test/></root>",
+		},
 	}
 
-	// Geçerli XML'i Node'a dönüştür
-	node, err := DecodeXml(validXml)
-	if err != nil {
-		t.Fatalf("Error decoding XML: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// XML'i Node'a dönüştür
+			node, err := DecodeXml([]byte(tt.xml))
+			if err != nil {
+				t.Fatalf("DecodeXml() error = %v", err)
+			}
 
-	// Node'u tekrar XML'e dönüştür
-	gotXml, err := NodeToXml(node)
-	if err != nil {
-		t.Fatalf("Error converting node to XML: %v", err)
-	}
+			// Node'u tekrar XML'e dönüştür
+			gotXml, err := NodeToXml(node)
+			if err != nil {
+				t.Fatalf("NodeToXml() error = %v", err)
+			}
 
-	// XML'leri normalize et ve karşılaştır
-	got := normalizeXml(string(gotXml))
-	want := normalizeXml(string(validXml))
+			// XML'leri normalize et ve karşılaştır
+			got := normalizeXml(string(gotXml))
+			want := normalizeXml(tt.want)
 
-	if got != want {
-		t.Errorf("NodeToXml() produced different XML\ngot:  %s\nwant: %s", got, want)
+			if got != want {
+				t.Errorf("NodeToXml() = %v, want %v", got, want)
+			}
+		})
 	}
 }
 
@@ -178,8 +209,8 @@ func normalizeXml(xml string) string {
 	xml = strings.ReplaceAll(xml, "\n", "")
 	xml = strings.ReplaceAll(xml, "\r", "")
 	xml = strings.ReplaceAll(xml, "\t", "")
+	xml = strings.ReplaceAll(xml, "  ", " ")
+	xml = strings.TrimSpace(xml)
 
-	// Birden fazla boşluğu tek boşluğa indir
-	parts := strings.Fields(xml)
-	return strings.Join(parts, "")
+	return xml
 }

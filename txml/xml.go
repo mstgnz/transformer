@@ -53,7 +53,14 @@ func DecodeXml(data []byte) (*node.Node, error) {
 
 		switch t := token.(type) {
 		case xml.StartElement:
-			// Create new node
+			// Flush any pending text content
+			text := strings.TrimSpace(textContent.String())
+			if text != "" && current != nil {
+				current.Value.Type = node.TypeString
+				current.Value.Worth = text
+			}
+			textContent.Reset()
+
 			n := &node.Node{
 				Key: t.Name.Local,
 				Value: &node.Value{
@@ -64,56 +71,44 @@ func DecodeXml(data []byte) (*node.Node, error) {
 			// Handle attributes
 			if len(t.Attr) > 0 {
 				for _, attr := range t.Attr {
-					if current == root && n.Key == "root" {
-						// Root attributes are added directly to root node
-						attrNode := &node.Node{
-							Key: attr.Name.Local,
-							Value: &node.Value{
-								Type:  node.TypeString,
-								Worth: attr.Value,
-							},
-						}
-						if err := root.AddToEnd(attrNode); err != nil {
-							return nil, err
-						}
-					} else {
-						// Non-root attributes are added to the current node
-						attrNode := &node.Node{
-							Key: attr.Name.Local,
-							Value: &node.Value{
-								Type:  node.TypeString,
-								Worth: attr.Value,
-							},
-						}
-						if err := n.AddToEnd(attrNode); err != nil {
-							return nil, err
-						}
+					attrNode := &node.Node{
+						Key: "@" + attr.Name.Local,
+						Value: &node.Value{
+							Type:  node.TypeString,
+							Worth: attr.Value,
+						},
+					}
+					if err := n.AddToEnd(attrNode); err != nil {
+						return nil, err
 					}
 				}
 			}
 
-			if err := current.AddToEnd(n); err != nil {
-				return nil, err
+			if t.Name.Local != "root" {
+				if err := current.AddToEnd(n); err != nil {
+					return nil, err
+				}
+			} else {
+				root = n
+				current = n
+				continue
 			}
-
 			stack = append(stack, current)
 			current = n
-			textContent.Reset()
 
 		case xml.EndElement:
+			// Flush any pending text content
 			text := strings.TrimSpace(textContent.String())
-			if text != "" && current != nil && current != root {
-				current.Value = &node.Value{
-					Type:  node.TypeString,
-					Worth: text,
-				}
+			if text != "" && current != nil {
+				current.Value.Type = node.TypeString
+				current.Value.Worth = text
 			}
+			textContent.Reset()
 
 			if len(stack) > 0 {
 				current = stack[len(stack)-1]
 				stack = stack[:len(stack)-1]
 			}
-			textContent.Reset()
 
 		case xml.CharData:
 			text := string(t)
@@ -132,70 +127,18 @@ func NodeToXml(n *node.Node) ([]byte, error) {
 		return nil, fmt.Errorf("node is nil")
 	}
 
-	if n.Value == nil {
-		return nil, fmt.Errorf("node value is nil")
-	}
-
 	var buf bytes.Buffer
 	buf.WriteString(xml.Header)
 
-	if err := writeNode(&buf, n); err != nil {
+	if err := writeNodeToXml(&buf, n); err != nil {
 		return nil, err
 	}
 
 	return buf.Bytes(), nil
 }
 
-// writeNode writes a Node to the buffer
-func writeNode(buf *bytes.Buffer, n *node.Node) error {
-	if n == nil || n.Value == nil {
-		return nil
-	}
-
-	// Handle root node
-	if n.Key == "root" {
-		buf.WriteString("<root")
-
-		// Write root attributes
-		if n.Value.Type == node.TypeObject && n.Value.Node != nil {
-			current := n.Value.Node
-			for current != nil {
-				if current.Value != nil && current.Value.Type == node.TypeString {
-					buf.WriteByte(' ')
-					buf.WriteString(current.Key)
-					buf.WriteString("=\"")
-					buf.WriteString(escapeXml(current.Value.Worth))
-					buf.WriteByte('"')
-				}
-				current = current.Next
-			}
-		}
-
-		buf.WriteByte('>')
-
-		// Write child nodes
-		if n.Value.Type == node.TypeObject && n.Value.Node != nil {
-			current := n.Value.Node
-			for current != nil {
-				if current.Value != nil && current.Value.Type != node.TypeString {
-					if err := writeChildNode(buf, current); err != nil {
-						return err
-					}
-				}
-				current = current.Next
-			}
-		}
-
-		buf.WriteString("</root>")
-		return nil
-	}
-
-	return writeChildNode(buf, n)
-}
-
-// writeChildNode writes a non-root node to the buffer
-func writeChildNode(buf *bytes.Buffer, n *node.Node) error {
-	if n == nil || n.Value == nil {
+func writeNodeToXml(buf *bytes.Buffer, n *node.Node) error {
+	if n == nil {
 		return nil
 	}
 
@@ -204,12 +147,12 @@ func writeChildNode(buf *bytes.Buffer, n *node.Node) error {
 	buf.WriteString(n.Key)
 
 	// Write attributes
-	if n.Value.Type == node.TypeObject && n.Value.Node != nil {
+	if n.Value != nil && n.Value.Node != nil {
 		current := n.Value.Node
 		for current != nil {
-			if current.Value != nil && current.Value.Type == node.TypeString {
+			if strings.HasPrefix(current.Key, "@") {
 				buf.WriteByte(' ')
-				buf.WriteString(current.Key)
+				buf.WriteString(strings.TrimPrefix(current.Key, "@"))
 				buf.WriteString("=\"")
 				buf.WriteString(escapeXml(current.Value.Worth))
 				buf.WriteByte('"')
@@ -218,50 +161,50 @@ func writeChildNode(buf *bytes.Buffer, n *node.Node) error {
 		}
 	}
 
-	// Handle different value types
-	switch n.Value.Type {
-	case node.TypeString:
-		buf.WriteByte('>')
-		buf.WriteString(escapeXml(n.Value.Worth))
-		buf.WriteString("</")
-		buf.WriteString(n.Key)
-		buf.WriteByte('>')
-		return nil
+	// Check if element is empty (no content and no child elements)
+	isEmpty := n.Value == nil ||
+		(n.Value.Type == node.TypeObject && n.Value.Worth == "" &&
+			(n.Value.Node == nil || onlyHasAttributes(n.Value.Node)))
 
-	case node.TypeNumber, node.TypeBoolean:
-		buf.WriteByte('>')
-		buf.WriteString(n.Value.Worth)
-		buf.WriteString("</")
-		buf.WriteString(n.Key)
-		buf.WriteByte('>')
-		return nil
-
-	case node.TypeObject:
-		buf.WriteByte('>')
-
-		// Write child nodes
-		if n.Value.Node != nil {
-			current := n.Value.Node
-			for current != nil {
-				if current.Value != nil && current.Value.Type != node.TypeString {
-					if err := writeChildNode(buf, current); err != nil {
-						return err
-					}
-				}
-				current = current.Next
-			}
-		}
-
-		buf.WriteString("</")
-		buf.WriteString(n.Key)
-		buf.WriteByte('>')
+	if isEmpty {
+		buf.WriteString("/>")
 		return nil
 	}
 
+	buf.WriteByte('>')
+
+	if n.Value.Type == node.TypeString {
+		buf.WriteString(escapeXml(n.Value.Worth))
+	} else if n.Value.Node != nil {
+		current := n.Value.Node
+		for current != nil {
+			if !strings.HasPrefix(current.Key, "@") {
+				if err := writeNodeToXml(buf, current); err != nil {
+					return err
+				}
+			}
+			current = current.Next
+		}
+	}
+
+	buf.WriteString("</")
+	buf.WriteString(n.Key)
+	buf.WriteByte('>')
 	return nil
 }
 
-// escapeXml escapes special XML characters
+// onlyHasAttributes checks if a node only has attribute nodes
+func onlyHasAttributes(n *node.Node) bool {
+	current := n
+	for current != nil {
+		if !strings.HasPrefix(current.Key, "@") {
+			return false
+		}
+		current = current.Next
+	}
+	return true
+}
+
 func escapeXml(s string) string {
 	s = strings.ReplaceAll(s, "&", "&amp;")
 	s = strings.ReplaceAll(s, "<", "&lt;")
