@@ -17,7 +17,7 @@ Transformer is a Go library that enables conversion between different data forma
 
 ## Requirements
 
-- Go 1.16 or higher
+- Go 1.23 or higher
 - Dependencies:
   - `gopkg.in/yaml.v3` for YAML operations
 
@@ -110,13 +110,43 @@ if err != nil {
 }
 
 // Convert Node structure to YAML
-yamlData, err := tyaml.NodeToYaml(node)
+yamlData, err := tyaml.NodeToYaml(node) // returns []byte
 if err != nil {
     log.Fatal(err)
 }
 ```
 
-### Cross-Format Conversions
+### Cross-Format Conversions (one-call API)
+
+```go
+import transformer "github.com/mstgnz/transformer"
+
+jsonData := []byte(`{"name": "John", "age": 30}`)
+
+// JSON -> XML
+xmlData, err := transformer.JsonToXml(jsonData)
+
+// JSON -> YAML
+yamlData, err := transformer.JsonToYaml(jsonData)
+
+// XML -> JSON
+xmlInput := []byte(`<root><name>John</name></root>`)
+jsonOut, err := transformer.XmlToJson(xmlInput)
+
+// XML -> YAML
+yamlOut, err := transformer.XmlToYaml(xmlInput)
+
+// YAML -> JSON
+yamlInput := []byte("name: John\nage: 30\n")
+jsonOut, err = transformer.YamlToJson(yamlInput)
+
+// YAML -> XML
+xmlOut, err := transformer.YamlToXml(yamlInput)
+```
+
+### Cross-Format Conversions (via Node)
+
+For more control — inspecting or modifying values between steps — use the Node API directly:
 
 ```go
 // JSON -> XML conversion
@@ -134,6 +164,48 @@ yamlData := []byte("name: John\nage: 30")
 node, _ := tyaml.DecodeYaml(yamlData)
 jsonData, _ := tjson.NodeToJson(node)
 ```
+
+## Format-Specific Behavior
+
+### XML Namespaces
+
+Namespace prefixes are preserved end-to-end. An element `soap:Envelope` is stored in the Node with key `"soap:Envelope"`, and namespace declarations are stored as `@xmlns:soap` attributes. Round-tripping a namespaced XML document produces identical output.
+
+```xml
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body/>
+</soap:Envelope>
+```
+
+decodes to a Node whose key is `"soap:Envelope"` with an `@xmlns:soap` attribute, then encodes back to the same XML.
+
+### JSON Large Integers
+
+JSON numbers are decoded using `json.Decoder.UseNumber()`, which preserves large integers exactly. Numbers larger than 2^53 that cannot be represented as `float64` without precision loss are kept as strings internally and written back as-is to JSON output.
+
+```go
+// 9007199254740993 is preserved exactly - no float64 rounding
+node, _ := tjson.DecodeJson([]byte(`{"id": 9007199254740993}`))
+out, _ := tjson.NodeToJson(node)
+// out == {"id":9007199254740993}
+```
+
+### YAML Anchors and Aliases
+
+YAML anchors (`&anchor`) and aliases (`*alias`) are resolved automatically by the YAML parser before the data reaches the Node structure. The resolved values are preserved correctly, but the anchor/alias syntax itself is not retained on re-encoding.
+
+```yaml
+defaults: &defaults
+  timeout: 30
+
+production:
+  <<: *defaults   # merged: production.timeout == 30 after decode
+  host: prod.example.com
+```
+
+### Nesting Depth Limit
+
+All decoders enforce a maximum nesting depth of 100 levels and return an error if exceeded. This prevents stack overflows on pathological inputs.
 
 ## Package Structure
 

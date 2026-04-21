@@ -1,69 +1,64 @@
+// Package transformer provides high-level convenience functions for converting
+// between JSON, XML, and YAML formats directly, without manually handling the
+// intermediate Node representation.
 package transformer
 
 import (
-	"fmt"
-	"log"
-	"os"
-	"strings"
-	"unicode"
-
-	"github.com/fatih/color"
-	"github.com/mstgnz/transformer/node"
+	"github.com/mstgnz/transformer/tjson"
+	"github.com/mstgnz/transformer/txml"
+	"github.com/mstgnz/transformer/tyaml"
 )
 
-// ErrorHandle
-// wrap error
-func ErrorHandle(err error) {
+// JsonToXml converts JSON bytes to XML bytes.
+func JsonToXml(data []byte) ([]byte, error) {
+	n, err := tjson.DecodeJson(data)
 	if err != nil {
-		log.Printf(err.Error())
+		return nil, err
 	}
+	return txml.NodeToXml(n)
 }
 
-// Contains
-// generic func for array contains any type
-func Contains[T comparable](s []T, e T) bool {
-	for _, v := range s {
-		if v == e {
-			return true
-		}
-	}
-	return false
-}
-
-// ConvertToNode
-// convert to Node
-func ConvertToNode(value any) *node.Node {
-	if knot, ok := value.(*node.Node); ok {
-		return knot
-	}
-	return nil
-}
-
-// ConvertToSlice
-// convert to any slice
-func ConvertToSlice(value any) []any {
-	slc, _ := value.([]any)
-	return slc
-}
-
-// StripSpaces
-// remove all spaces
-func StripSpaces(str string) string {
-	return strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
-			// if the character is a space, drop it
-			return -1
-		}
-		// else keep it in the string
-		return r
-	}, str)
-}
-
-// PrintErr
-// with format
-func PrintErr(format string, args ...any) {
-	_, err := fmt.Fprintf(os.Stderr, color.RedString("error: "+format+"\n"), args...)
+// JsonToYaml converts JSON bytes to YAML bytes.
+func JsonToYaml(data []byte) ([]byte, error) {
+	n, err := tjson.DecodeJson(data)
 	if err != nil {
-		log.Println("error printing failed")
+		return nil, err
 	}
+	return tyaml.NodeToYaml(n)
+}
+
+// XmlToJson converts XML bytes to JSON bytes.
+func XmlToJson(data []byte) ([]byte, error) {
+	n, err := txml.DecodeXml(data)
+	if err != nil {
+		return nil, err
+	}
+	return tjson.NodeToJson(n)
+}
+
+// XmlToYaml converts XML bytes to YAML bytes.
+func XmlToYaml(data []byte) ([]byte, error) {
+	n, err := txml.DecodeXml(data)
+	if err != nil {
+		return nil, err
+	}
+	return tyaml.NodeToYaml(n)
+}
+
+// YamlToJson converts YAML bytes to JSON bytes.
+func YamlToJson(data []byte) ([]byte, error) {
+	n, err := tyaml.DecodeYaml(data)
+	if err != nil {
+		return nil, err
+	}
+	return tjson.NodeToJson(n)
+}
+
+// YamlToXml converts YAML bytes to XML bytes.
+func YamlToXml(data []byte) ([]byte, error) {
+	n, err := tyaml.DecodeYaml(data)
+	if err != nil {
+		return nil, err
+	}
+	return txml.NodeToXml(n)
 }

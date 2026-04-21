@@ -17,7 +17,7 @@ Transformer, farklı veri formatları (JSON, XML, YAML) arasında dönüşüm ya
 
 ## Gereksinimler
 
-- Go 1.16 veya üzeri
+- Go 1.23 veya üzeri
 - Bağımlılıklar:
   - YAML işlemleri için `gopkg.in/yaml.v3`
 
@@ -110,13 +110,43 @@ if err != nil {
 }
 
 // Node yapısını YAML'a dönüştürme
-yamlData, err := tyaml.NodeToYaml(node)
+yamlData, err := tyaml.NodeToYaml(node) // []byte döner
 if err != nil {
     log.Fatal(err)
 }
 ```
 
-### Formatlar Arası Dönüşüm
+### Formatlar Arası Dönüşüm (tek satir API)
+
+```go
+import transformer "github.com/mstgnz/transformer"
+
+jsonData := []byte(`{"name": "John", "age": 30}`)
+
+// JSON -> XML
+xmlData, err := transformer.JsonToXml(jsonData)
+
+// JSON -> YAML
+yamlData, err := transformer.JsonToYaml(jsonData)
+
+// XML -> JSON
+xmlInput := []byte(`<root><name>John</name></root>`)
+jsonOut, err := transformer.XmlToJson(xmlInput)
+
+// XML -> YAML
+yamlOut, err := transformer.XmlToYaml(xmlInput)
+
+// YAML -> JSON
+yamlInput := []byte("name: John\nage: 30\n")
+jsonOut, err = transformer.YamlToJson(yamlInput)
+
+// YAML -> XML
+xmlOut, err := transformer.YamlToXml(yamlInput)
+```
+
+### Formatlar Arası Dönüşüm (Node uzerinden)
+
+Degerleri adimlar arasinda incelemek veya degistirmek icin Node API'si kullanilabilir:
 
 ```go
 // JSON -> XML dönüşümü
@@ -134,6 +164,48 @@ yamlData := []byte("name: John\nage: 30")
 node, _ := tyaml.DecodeYaml(yamlData)
 jsonData, _ := tjson.NodeToJson(node)
 ```
+
+## Format-Spesifik Davranislar
+
+### XML Namespace'leri
+
+Namespace prefix'leri uçtan uca korunur. `soap:Envelope` gibi bir element, Node'da `"soap:Envelope"` anahtariyla saklanir; namespace bildirimleri `@xmlns:soap` gibi attribute'lar olarak tutulur. Namespace'li bir XML belgesinin round-trip'i ayni ciktiy uretir.
+
+```xml
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body/>
+</soap:Envelope>
+```
+
+Bu XML decode edildiginde key'i `"soap:Envelope"`, attribute'u `@xmlns:soap` olan bir Node olusur ve geri ayni XML'e encode edilir.
+
+### JSON Buyuk Tamsayilar
+
+JSON sayilari `json.Decoder.UseNumber()` kullanilarak decode edilir; bu sayede buyuk tamsayilar tam olarak korunur. `float64` olarak kayipsiz temsil edilemeyen 2^53'ten buyuk sayilar dahili olarak string olarak saklanir ve JSON ciktisina oldugu gibi yazilir.
+
+```go
+// 9007199254740993 tam olarak korunur, float64 yuvarlamasi olmaz
+node, _ := tjson.DecodeJson([]byte(`{"id": 9007199254740993}`))
+out, _ := tjson.NodeToJson(node)
+// out == {"id":9007199254740993}
+```
+
+### YAML Anchor ve Alias'lar
+
+YAML anchor'lari (`&anchor`) ve alias'lari (`*alias`), veri Node yapisina ulasmadan once YAML parser tarafindan otomatik olarak cozumlenir. Cozumlenen degerler dogru sekilde korunur; ancak anchor/alias sozdizimi yeniden encode sirasinda saklanmaz.
+
+```yaml
+defaults: &defaults
+  timeout: 30
+
+production:
+  <<: *defaults   # birlestirilir: decode sonrasi production.timeout == 30
+  host: prod.example.com
+```
+
+### Yuvalama Derinligi Siniri
+
+Tum decoder'lar maksimum 100 seviye yuvalama derinligini zorunlu kilar ve asildigi durumda hata doner. Bu, kotü niyetli girdilerde stack overflow'u onler.
 
 ## Paket Yapısı
 

@@ -3,6 +3,7 @@
 package tjson
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/mstgnz/transformer/node"
 )
+
+const maxDepth = 100
 
 // IsJson checks if the given bytes represent valid JSON
 func IsJson(data []byte) bool {
@@ -28,122 +31,108 @@ func ReadJson(filename string) ([]byte, error) {
 	return data, nil
 }
 
-// DecodeJson decodes JSON bytes into a Node
+// DecodeJson decodes JSON bytes into a Node.
+// Numbers are preserved exactly (no float64 rounding) using json.Number.
 func DecodeJson(data []byte) (*node.Node, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+
 	var jsonData any
-	if err := json.Unmarshal(data, &jsonData); err != nil {
+	if err := dec.Decode(&jsonData); err != nil {
 		return nil, err
 	}
 
-	return interfaceToNode("root", jsonData), nil
+	return interfaceToNode("root", jsonData, 0)
 }
 
-// interfaceToNode converts an any to a Node
-func interfaceToNode(key string, data any) *node.Node {
+// interfaceToNode converts an any to a Node with depth tracking.
+func interfaceToNode(key string, data any, depth int) (*node.Node, error) {
+	if depth > maxDepth {
+		return nil, fmt.Errorf("max nesting depth %d exceeded", maxDepth)
+	}
+
 	if data == nil {
 		return &node.Node{
-			Key: key,
-			Value: &node.Value{
-				Type: node.TypeNull,
-			},
-		}
+			Key:   key,
+			Value: &node.Value{Type: node.TypeNull},
+		}, nil
 	}
 
 	switch v := data.(type) {
 	case map[string]any:
 		n := &node.Node{
-			Key: key,
-			Value: &node.Value{
-				Type: node.TypeObject,
-			},
+			Key:   key,
+			Value: &node.Value{Type: node.TypeObject},
 		}
-
 		var last *node.Node
 		for k, val := range v {
-			child := interfaceToNode(k, val)
-			if child != nil {
-				child.Parent = n
-				if last == nil {
-					n.Value.Node = child
-				} else {
-					last.Next = child
-					child.Prev = last
-				}
-				last = child
+			child, err := interfaceToNode(k, val, depth+1)
+			if err != nil {
+				return nil, err
 			}
+			child.Parent = n
+			if last == nil {
+				n.Value.Node = child
+			} else {
+				last.Next = child
+				child.Prev = last
+			}
+			last = child
 		}
-		return n
+		return n, nil
 
 	case []any:
 		n := &node.Node{
-			Key: key,
-			Value: &node.Value{
-				Type:  node.TypeArray,
-				Array: make([]*node.Value, len(v)),
-			},
+			Key:   key,
+			Value: &node.Value{Type: node.TypeArray, Array: make([]*node.Value, len(v))},
 		}
-
 		for i, item := range v {
 			if item == nil {
 				n.Value.Array[i] = &node.Value{Type: node.TypeNull}
 				continue
 			}
-
 			switch val := item.(type) {
 			case map[string]any:
-				child := interfaceToNode(fmt.Sprintf("item%d", i), val)
-				if child != nil {
-					n.Value.Array[i] = &node.Value{
-						Type: node.TypeObject,
-						Node: child,
-					}
+				child, err := interfaceToNode(fmt.Sprintf("item%d", i), val, depth+1)
+				if err != nil {
+					return nil, err
 				}
+				n.Value.Array[i] = &node.Value{Type: node.TypeObject, Node: child}
 			case []any:
-				child := interfaceToNode(fmt.Sprintf("item%d", i), val)
-				if child != nil {
-					n.Value.Array[i] = child.Value
+				child, err := interfaceToNode(fmt.Sprintf("item%d", i), val, depth+1)
+				if err != nil {
+					return nil, err
 				}
+				n.Value.Array[i] = child.Value
 			default:
 				n.Value.Array[i] = valueFromInterface(val)
 			}
 		}
-		return n
+		return n, nil
+
+	case json.Number:
+		return &node.Node{
+			Key:   key,
+			Value: &node.Value{Type: node.TypeNumber, Worth: v.String()},
+		}, nil
 
 	case string:
 		return &node.Node{
-			Key: key,
-			Value: &node.Value{
-				Type:  node.TypeString,
-				Worth: v,
-			},
-		}
-
-	case float64:
-		return &node.Node{
-			Key: key,
-			Value: &node.Value{
-				Type:  node.TypeNumber,
-				Worth: strconv.FormatFloat(v, 'f', -1, 64),
-			},
-		}
+			Key:   key,
+			Value: &node.Value{Type: node.TypeString, Worth: v},
+		}, nil
 
 	case bool:
 		return &node.Node{
-			Key: key,
-			Value: &node.Value{
-				Type:  node.TypeBoolean,
-				Worth: strconv.FormatBool(v),
-			},
-		}
+			Key:   key,
+			Value: &node.Value{Type: node.TypeBoolean, Worth: strconv.FormatBool(v)},
+		}, nil
 
 	default:
 		return &node.Node{
-			Key: key,
-			Value: &node.Value{
-				Type:  node.TypeString,
-				Worth: fmt.Sprint(v),
-			},
-		}
+			Key:   key,
+			Value: &node.Value{Type: node.TypeString, Worth: fmt.Sprint(v)},
+		}, nil
 	}
 }
 
@@ -152,28 +141,15 @@ func valueFromInterface(data any) *node.Value {
 	if data == nil {
 		return &node.Value{Type: node.TypeNull}
 	}
-
 	switch v := data.(type) {
+	case json.Number:
+		return &node.Value{Type: node.TypeNumber, Worth: v.String()}
 	case string:
-		return &node.Value{
-			Type:  node.TypeString,
-			Worth: v,
-		}
-	case float64:
-		return &node.Value{
-			Type:  node.TypeNumber,
-			Worth: strconv.FormatFloat(v, 'f', -1, 64),
-		}
+		return &node.Value{Type: node.TypeString, Worth: v}
 	case bool:
-		return &node.Value{
-			Type:  node.TypeBoolean,
-			Worth: strconv.FormatBool(v),
-		}
+		return &node.Value{Type: node.TypeBoolean, Worth: strconv.FormatBool(v)}
 	default:
-		return &node.Value{
-			Type:  node.TypeString,
-			Worth: fmt.Sprint(v),
-		}
+		return &node.Value{Type: node.TypeString, Worth: fmt.Sprint(v)}
 	}
 }
 
@@ -182,11 +158,9 @@ func NodeToJson(n *node.Node) ([]byte, error) {
 	if n == nil {
 		return nil, fmt.Errorf("node is nil")
 	}
-
 	if n.Value == nil {
 		return nil, fmt.Errorf("node value is nil")
 	}
-
 	data := nodeToInterface(n)
 	return json.Marshal(data)
 }
@@ -213,7 +187,6 @@ func nodeToInterface(n *node.Node) any {
 				current = current.Next
 			}
 			return result
-
 		case node.TypeArray:
 			result := make([]any, 0)
 			for _, item := range n.Value.Array {
@@ -226,7 +199,6 @@ func nodeToInterface(n *node.Node) any {
 				}
 			}
 			return result
-
 		default:
 			return convertValue(n.Value)
 		}
@@ -247,7 +219,6 @@ func nodeToInterface(n *node.Node) any {
 			current = current.Next
 		}
 		return result
-
 	case node.TypeArray:
 		result := make([]any, 0)
 		for _, item := range n.Value.Array {
@@ -260,22 +231,28 @@ func nodeToInterface(n *node.Node) any {
 			}
 		}
 		return result
-
 	default:
 		return convertValue(n.Value)
 	}
 }
 
-// convertValue converts a Value to a suitable any type
+// convertValue converts a Value to a suitable any type.
+// Integers are returned as int64 to avoid float notation in JSON output.
 func convertValue(v *node.Value) any {
 	if v == nil {
 		return nil
 	}
-
 	switch v.Type {
 	case node.TypeString:
 		return v.Worth
 	case node.TypeNumber:
+		// Try integer first to avoid float64 precision loss on large integers.
+		if i, err := strconv.ParseInt(v.Worth, 10, 64); err == nil {
+			return i
+		}
+		if u, err := strconv.ParseUint(v.Worth, 10, 64); err == nil {
+			return u
+		}
 		if f, err := strconv.ParseFloat(v.Worth, 64); err == nil {
 			return f
 		}

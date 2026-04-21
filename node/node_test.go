@@ -1264,6 +1264,275 @@ func TestNode_String(t *testing.T) {
 	}
 }
 
+func TestNode_String_MoreCases(t *testing.T) {
+	// Array node
+	n := &Node{
+		Key: "arr",
+		Value: &Value{
+			Type: TypeArray,
+			Array: []*Value{
+				{Type: TypeString, Worth: "a"},
+				{Type: TypeString, Worth: "b"},
+				nil,
+				{Type: TypeString, Worth: "c", Node: &Node{Key: "x", Value: &Value{Type: TypeString, Worth: "v"}}},
+			},
+		},
+	}
+	s := n.String()
+	if s == "" {
+		t.Error("String() for array node returned empty string")
+	}
+
+	// Node with nil Value
+	n2 := &Node{Key: "k", Value: nil}
+	if got := n2.String(); got != "k" {
+		t.Errorf("String() for nil value node = %q, want %q", got, "k")
+	}
+
+	// Number, Boolean, Null default branch
+	for _, typ := range []ValueType{TypeNumber, TypeBoolean, TypeNull} {
+		n3 := &Node{Key: "k", Value: &Value{Type: typ, Worth: "x"}}
+		if s := n3.String(); s == "" {
+			t.Errorf("String() for type %v returned empty", typ)
+		}
+	}
+}
+
+func TestNode_Equal_MoreCases(t *testing.T) {
+	// n.Value nil, other.Value nil
+	n1 := &Node{Key: "k", Value: nil}
+	n2 := &Node{Key: "k", Value: nil}
+	if !n1.Equal(n2) {
+		t.Error("Equal: both nil values should be equal")
+	}
+
+	// n.Value nil, other.Value not nil
+	n3 := &Node{Key: "k", Value: nil}
+	n4 := &Node{Key: "k", Value: &Value{Type: TypeNull}}
+	if n3.Equal(n4) {
+		t.Error("Equal: nil vs non-nil value should be not equal")
+	}
+
+	// n.Value not nil, other.Value nil
+	if n4.Equal(n3) {
+		t.Error("Equal: non-nil vs nil value should be not equal")
+	}
+
+	// Different types
+	n5 := &Node{Key: "k", Value: &Value{Type: TypeString, Worth: "v"}}
+	n6 := &Node{Key: "k", Value: &Value{Type: TypeNumber, Worth: "v"}}
+	if n5.Equal(n6) {
+		t.Error("Equal: different types should be not equal")
+	}
+
+	// With child node - both have same child
+	child1 := &Node{Key: "c", Value: &Value{Type: TypeString, Worth: "val"}}
+	child2 := &Node{Key: "c", Value: &Value{Type: TypeString, Worth: "val"}}
+	n7 := &Node{Key: "k", Value: &Value{Type: TypeObject, Node: child1}}
+	n8 := &Node{Key: "k", Value: &Value{Type: TypeObject, Node: child2}}
+	if !n7.Equal(n8) {
+		t.Error("Equal: nodes with equal children should be equal")
+	}
+
+	// Array: different lengths
+	n9 := &Node{Key: "k", Value: &Value{Type: TypeArray, Array: []*Value{{Type: TypeString, Worth: "a"}}}}
+	n10 := &Node{Key: "k", Value: &Value{Type: TypeArray, Array: []*Value{{Type: TypeString, Worth: "a"}, {Type: TypeString, Worth: "b"}}}}
+	if n9.Equal(n10) {
+		t.Error("Equal: different array lengths should be not equal")
+	}
+
+	// Array: same length, different items
+	n11 := &Node{Key: "k", Value: &Value{Type: TypeArray, Array: []*Value{{Type: TypeString, Worth: "a"}}}}
+	n12 := &Node{Key: "k", Value: &Value{Type: TypeArray, Array: []*Value{{Type: TypeString, Worth: "b"}}}}
+	if n11.Equal(n12) {
+		t.Error("Equal: different array items should be not equal")
+	}
+
+	// Array: one nil item vs non-nil
+	n13 := &Node{Key: "k", Value: &Value{Type: TypeArray, Array: []*Value{nil}}}
+	n14 := &Node{Key: "k", Value: &Value{Type: TypeArray, Array: []*Value{{Type: TypeNull}}}}
+	if n13.Equal(n14) {
+		t.Error("Equal: nil vs non-nil array item should be not equal")
+	}
+
+	// Array: both nil items
+	n15 := &Node{Key: "k", Value: &Value{Type: TypeArray, Array: []*Value{nil}}}
+	n16 := &Node{Key: "k", Value: &Value{Type: TypeArray, Array: []*Value{nil}}}
+	if !n15.Equal(n16) {
+		t.Error("Equal: both nil array items should be equal")
+	}
+
+	// Array item with nested node
+	childA := &Node{Key: "x", Value: &Value{Type: TypeString, Worth: "v"}}
+	childB := &Node{Key: "x", Value: &Value{Type: TypeString, Worth: "v"}}
+	n17 := &Node{Key: "k", Value: &Value{Type: TypeArray, Array: []*Value{{Type: TypeObject, Node: childA}}}}
+	n18 := &Node{Key: "k", Value: &Value{Type: TypeArray, Array: []*Value{{Type: TypeObject, Node: childB}}}}
+	if !n17.Equal(n18) {
+		t.Error("Equal: array items with equal nodes should be equal")
+	}
+
+	// Array item with unequal nested nodes
+	childC := &Node{Key: "x", Value: &Value{Type: TypeString, Worth: "other"}}
+	n19 := &Node{Key: "k", Value: &Value{Type: TypeArray, Array: []*Value{{Type: TypeObject, Node: childC}}}}
+	if n17.Equal(n19) {
+		t.Error("Equal: array items with unequal nodes should be not equal")
+	}
+}
+
+func TestNode_Clone_MoreCases(t *testing.T) {
+	// Clone node with array item that has a child node
+	childNode := &Node{Key: "c", Value: &Value{Type: TypeString, Worth: "val"}}
+	n := &Node{
+		Key: "k",
+		Value: &Value{
+			Type: TypeArray,
+			Array: []*Value{
+				{Type: TypeObject, Node: childNode},
+				nil,
+			},
+		},
+	}
+	cloned := n.Clone()
+	if cloned == nil {
+		t.Fatal("Clone() returned nil")
+	}
+	if len(cloned.Value.Array) != len(n.Value.Array) {
+		t.Errorf("Clone() array length mismatch: got %d, want %d", len(cloned.Value.Array), len(n.Value.Array))
+	}
+}
+
+func TestNode_FindNodes_MoreCases(t *testing.T) {
+	// nil node
+	var n *Node
+	result := n.FindNodes(func(node *Node) bool { return true })
+	if result != nil {
+		t.Error("FindNodes on nil node should return nil")
+	}
+
+	// nil predicate
+	n2 := NewNode("root")
+	result2 := n2.FindNodes(nil)
+	if result2 != nil {
+		t.Error("FindNodes with nil predicate should return nil")
+	}
+
+	// Array items
+	child := &Node{
+		Key: "item0",
+		Value: &Value{Type: TypeString, Worth: "val"},
+	}
+	n3 := &Node{
+		Key: "root",
+		Value: &Value{
+			Type:  TypeArray,
+			Array: []*Value{{Type: TypeObject, Node: child}},
+		},
+	}
+	results := n3.FindNodes(func(node *Node) bool {
+		return node.Key == "item0"
+	})
+	if len(results) != 1 {
+		t.Errorf("FindNodes() found %d nodes, want 1", len(results))
+	}
+}
+
+func TestNode_Validate_MoreCases(t *testing.T) {
+	// Node with broken next-prev pointer (next.Prev doesn't point back)
+	n1 := &Node{Key: "a", Value: &Value{Type: TypeString}}
+	n2 := &Node{Key: "b", Value: &Value{Type: TypeString}}
+	n1.Next = n2
+	// Don't set n2.Prev = n1 intentionally to break the invariant
+	err := n1.Validate()
+	if err == nil {
+		t.Error("Validate() should fail for broken next-prev relationship")
+	}
+
+	// Node with broken prev-next pointer
+	n3 := &Node{Key: "c", Value: &Value{Type: TypeString}}
+	n4 := &Node{Key: "d", Value: &Value{Type: TypeString}}
+	n3.Prev = n4
+	// Don't set n4.Next = n3
+	err2 := n3.Validate()
+	if err2 == nil {
+		t.Error("Validate() should fail for broken prev-next relationship")
+	}
+
+	// Array with invalid item node
+	badChild := &Node{Key: "bad", Value: nil}
+	n5 := &Node{
+		Key: "arr",
+		Value: &Value{
+			Type:  TypeArray,
+			Array: []*Value{{Type: TypeObject, Node: badChild}},
+		},
+	}
+	err3 := n5.Validate()
+	if err3 == nil {
+		t.Error("Validate() should fail for invalid array item node")
+	}
+}
+
+func TestNode_Print_MoreCases(t *testing.T) {
+	// Redirect stdout to /dev/null for the print tests
+	old := os.Stdout
+	null, _ := os.Open(os.DevNull)
+	os.Stdout = null
+	defer func() { os.Stdout = old; null.Close() }()
+
+	// Print array with nil item
+	n := &Node{
+		Key: "arr",
+		Value: &Value{
+			Type:  TypeArray,
+			Array: []*Value{nil, {Type: TypeString, Worth: "a"}, {Type: TypeNull}},
+		},
+	}
+	n.Print() // Should not panic
+
+	// Print number
+	n2 := &Node{Key: "num", Value: &Value{Type: TypeNumber, Worth: "42"}}
+	n2.Print()
+
+	// Print boolean
+	n3 := &Node{Key: "flag", Value: &Value{Type: TypeBoolean, Worth: "true"}}
+	n3.Print()
+
+	// Print null
+	n4 := &Node{Key: "empty", Value: &Value{Type: TypeNull}}
+	n4.Print()
+
+	// Print nil value
+	n5 := &Node{Key: "nilval", Value: nil}
+	n5.Print()
+
+	// Print with nested child in array
+	childNode := &Node{Key: "child", Value: &Value{Type: TypeString, Worth: "v"}}
+	n6 := &Node{
+		Key: "arr",
+		Value: &Value{
+			Type:  TypeArray,
+			Array: []*Value{{Type: TypeObject, Node: childNode}},
+		},
+	}
+	n6.Print()
+}
+
+func TestNode_GetNode_MoreCases(t *testing.T) {
+	// Array with item nodes
+	child := &Node{Key: "target", Value: &Value{Type: TypeString, Worth: "val"}}
+	n := &Node{
+		Key: "root",
+		Value: &Value{
+			Type:  TypeArray,
+			Array: []*Value{{Type: TypeObject, Node: child}},
+		},
+	}
+	results := n.GetNode("target")
+	if len(results) != 1 {
+		t.Errorf("GetNode() found %d nodes in array, want 1", len(results))
+	}
+}
+
 func TestNode_Type(t *testing.T) {
 	tests := []struct {
 		name string
