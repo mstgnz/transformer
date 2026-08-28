@@ -483,3 +483,283 @@ func TestNodeToJson_ArrayWithObjects(t *testing.T) {
 		t.Errorf("expected 'id' in output, got: %s", string(out))
 	}
 }
+
+// ---- Key order ----
+
+// TestDecodeJson_PreservesKeyOrder pins the reason the Node model is a linked
+// list. Routing a document through map[string]any used to reshuffle it.
+func TestDecodeJson_PreservesKeyOrder(t *testing.T) {
+	n, err := DecodeJson([]byte(`{"zebra":1,"apple":2,"mango":3,"beta":4,"alpha":5}`))
+	if err != nil {
+		t.Fatalf("DecodeJson error: %v", err)
+	}
+
+	want := []string{"zebra", "apple", "mango", "beta", "alpha"}
+	var got []string
+	for current := n.Value.Node; current != nil; current = current.Next {
+		got = append(got, current.Key)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("key order = %v, want %v", got, want)
+	}
+}
+
+// TestNodeToJson_OutputIsDeterministic guards the same property on the way out:
+// encoding/json sorts map keys, so the writer must not go through a map.
+func TestNodeToJson_OutputIsDeterministic(t *testing.T) {
+	input := []byte(`{"zebra":1,"apple":2,"mango":3,"beta":4,"alpha":5,"kilo":6,"delta":7}`)
+
+	var first string
+	for i := 0; i < 25; i++ {
+		n, err := DecodeJson(input)
+		if err != nil {
+			t.Fatalf("DecodeJson error: %v", err)
+		}
+		out, err := NodeToJson(n)
+		if err != nil {
+			t.Fatalf("NodeToJson error: %v", err)
+		}
+		if i == 0 {
+			first = string(out)
+			continue
+		}
+		if string(out) != first {
+			t.Fatalf("output changed between runs:\nrun 0: %s\nrun %d: %s", first, i, out)
+		}
+	}
+	if first != string(input) {
+		t.Errorf("output = %s, want the input order back: %s", first, input)
+	}
+}
+
+// ---- Round-trip fidelity ----
+
+// TestJsonRoundTrip_Identical checks that a canonical document survives a trip
+// through the Node model unchanged, byte for byte.
+func TestJsonRoundTrip_Identical(t *testing.T) {
+	tests := []struct {
+		name string
+		json string
+	}{
+		{"key order", `{"b":2,"a":1,"c":3}`},
+		{"scalars", `{"n":null,"t":true,"f":false,"s":"text"}`},
+		{"numbers", `{"int":42,"neg":-17,"float":3.14,"exp":1e10}`},
+		{"big integers", `{"id":9007199254740993,"huge":12345678901234567890}`},
+		{"array of scalars", `{"tags":["go","json","yaml"]}`},
+		{"array of objects", `{"users":[{"name":"alice"},{"name":"bob"}]}`},
+		{"nested arrays", `{"matrix":[[1,2],[3,4]],"deep":[[[5]]]}`},
+		{"mixed array", `{"mixed":[1,"two",true,null,{"k":"v"},[6]]}`},
+		{"empty containers", `{"obj":{},"arr":[],"str":""}`},
+		{"top level array", `[1,2,3]`},
+		{"top level scalar", `"hello"`},
+		{"unicode", `{"city":"İstanbul","emoji":"🚀"}`},
+		{"deep nesting", `{"a":{"b":{"c":{"d":"e"}}}}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n, err := DecodeJson([]byte(tt.json))
+			if err != nil {
+				t.Fatalf("DecodeJson error: %v", err)
+			}
+			out, err := NodeToJson(n)
+			if err != nil {
+				t.Fatalf("NodeToJson error: %v", err)
+			}
+			if string(out) != tt.json {
+				t.Errorf("round trip changed the document\ngot:  %s\nwant: %s", out, tt.json)
+			}
+		})
+	}
+}
+
+// TestDecodeJson_NestedArrays covers the shape that used to be flattened into
+// an empty string on the way out.
+func TestDecodeJson_NestedArrays(t *testing.T) {
+	n, err := DecodeJson([]byte(`{"matrix":[[1,2],[3]]}`))
+	if err != nil {
+		t.Fatalf("DecodeJson error: %v", err)
+	}
+
+	matrix := n.Value.Node
+	if matrix == nil || matrix.Value.Type != node.TypeArray {
+		t.Fatalf("expected an array node, got %v", matrix)
+	}
+	if len(matrix.Value.Array) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(matrix.Value.Array))
+	}
+	first := matrix.Value.Array[0]
+	if first.Type != node.TypeArray {
+		t.Fatalf("expected the first row to stay an array, got %v", first.Type)
+	}
+	if len(first.Array) != 2 || first.Array[0].Worth != "1" || first.Array[1].Worth != "2" {
+		t.Errorf("first row lost its values: %+v", first.Array)
+	}
+}
+
+// ---- Input validation ----
+
+func TestDecodeJson_TrailingData(t *testing.T) {
+	tests := []struct {
+		name    string
+		json    string
+		wantErr bool
+	}{
+		{"single document", `{"a":1}`, false},
+		{"trailing whitespace", "{\"a\":1}\n  ", false},
+		{"two documents", `{"a":1}{"b":2}`, true},
+		{"trailing garbage", `{"a":1} nonsense`, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := DecodeJson([]byte(tt.json))
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DecodeJson() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestNodeToJson_DepthLimit(t *testing.T) {
+	root := &node.Node{Key: "root", Value: &node.Value{Type: node.TypeObject}}
+	current := root
+	for i := 0; i <= maxDepth+2; i++ {
+		child := &node.Node{Key: "a", Value: &node.Value{Type: node.TypeObject}}
+		current.Value.Node = child
+		child.Parent = current
+		current = child
+	}
+	if _, err := NodeToJson(root); err == nil {
+		t.Error("expected an error past the depth limit")
+	}
+}
+
+// TestNodeToJson_EscapesText checks that text which would otherwise break the
+// document is escaped rather than written raw.
+func TestNodeToJson_EscapesText(t *testing.T) {
+	n, err := DecodeJson([]byte(`{"text":"a \"quote\", a \\backslash\\ and a <tag>"}`))
+	if err != nil {
+		t.Fatalf("DecodeJson error: %v", err)
+	}
+	out, err := NodeToJson(n)
+	if err != nil {
+		t.Fatalf("NodeToJson error: %v", err)
+	}
+	if !IsJson(out) {
+		t.Fatalf("output is not valid JSON: %s", out)
+	}
+
+	// Decoding the output must give back the same text.
+	n2, err := DecodeJson(out)
+	if err != nil {
+		t.Fatalf("DecodeJson round-trip error: %v", err)
+	}
+	want := `a "quote", a \backslash\ and a <tag>`
+	if got := n2.Value.Node.Value.Worth; got != want {
+		t.Errorf("text = %q, want %q", got, want)
+	}
+}
+
+// ---- Malformed input ----
+
+func TestDecodeJson_Truncated(t *testing.T) {
+	tests := []string{
+		`{`,
+		`{"a"`,
+		`{"a":`,
+		`{"a":1`,
+		`[`,
+		`[1`,
+		`[1,`,
+		`[1,2`,
+		`{"a":[1,`,
+		`{"a":{"b":`,
+	}
+	for _, tt := range tests {
+		t.Run(tt, func(t *testing.T) {
+			if _, err := DecodeJson([]byte(tt)); err == nil {
+				t.Errorf("DecodeJson(%q) returned no error", tt)
+			}
+		})
+	}
+}
+
+// ---- Values a hand-built node can hold ----
+
+func TestNodeToJson_UnknownType(t *testing.T) {
+	n := &node.Node{
+		Key: "root",
+		Value: &node.Value{
+			Type: node.TypeObject,
+			Node: &node.Node{
+				Key:   "odd",
+				Value: &node.Value{Type: node.ValueType(99), Worth: "value"},
+			},
+		},
+	}
+	out, err := NodeToJson(n)
+	if err != nil {
+		t.Fatalf("NodeToJson error: %v", err)
+	}
+	if want := `{"odd":"value"}`; string(out) != want {
+		t.Errorf("got %s, want %s", out, want)
+	}
+	if !IsJson(out) {
+		t.Errorf("output is not valid JSON: %s", out)
+	}
+}
+
+// TestNodeToJson_NumberFormsAreNormalized covers numeric text that JSON cannot
+// write as it stands. It is converted where that is possible and quoted where
+// it is not, so the output parses either way.
+func TestNodeToJson_NumberFormsAreNormalized(t *testing.T) {
+	tests := []struct {
+		name  string
+		worth string
+		want  string
+	}{
+		{"plain", "42", `{"n":42}`},
+		{"hexadecimal", "0x1F", `{"n":31}`},
+		{"leading zeros", "007", `{"n":7}`},
+		{"infinity", "Inf", `{"n":"Inf"}`},
+		{"text", "not-a-number", `{"n":"not-a-number"}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := &node.Node{
+				Key: "root",
+				Value: &node.Value{
+					Type: node.TypeObject,
+					Node: &node.Node{Key: "n", Value: &node.Value{Type: node.TypeNumber, Worth: tt.worth}},
+				},
+			}
+			out, err := NodeToJson(n)
+			if err != nil {
+				t.Fatalf("NodeToJson error: %v", err)
+			}
+			if string(out) != tt.want {
+				t.Errorf("got %s, want %s", out, tt.want)
+			}
+			if !IsJson(out) {
+				t.Errorf("output is not valid JSON: %s", out)
+			}
+		})
+	}
+}
+
+func TestNodeToJson_NilArrayElement(t *testing.T) {
+	n := &node.Node{
+		Key: "root",
+		Value: &node.Value{
+			Type:  node.TypeArray,
+			Array: []*node.Value{nil, {Type: node.TypeString, Worth: "x"}},
+		},
+	}
+	out, err := NodeToJson(n)
+	if err != nil {
+		t.Fatalf("NodeToJson error: %v", err)
+	}
+	if want := `[null,"x"]`; string(out) != want {
+		t.Errorf("got %s, want %s", out, want)
+	}
+}

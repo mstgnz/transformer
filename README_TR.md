@@ -1,6 +1,6 @@
 # Transformer
 
-Transformer, farklı veri formatları (JSON, XML, YAML) arasında dönüşüm yapmanızı sağlayan bir Go kütüphanesidir. Ortak bir veri yapısı kullanarak, bu formatlar arasında kayıpsız dönüşüm yapabilirsiniz.
+Transformer, farklı veri formatları (JSON, XML, YAML) arasında dönüşüm yapmanızı sağlayan bir Go kütüphanesidir. Bir belge tek bir ortak agaca cozulur ve butun yazicilar bu agaci okur; boylece anahtar sirasi, deger tipleri ve tekrarli element'ler yolculuktan sag cikar. Her formatin ifade edemedigi seyler [Format-Spesifik Davranislar](#format-spesifik-davranislar) altinda listelidir.
 
 [English Documentation (İngilizce Dokümantasyon)](README.md)
 
@@ -167,6 +167,35 @@ jsonData, _ := tjson.NodeToJson(node)
 
 ## Format-Spesifik Davranislar
 
+### Anahtar Sirasi
+
+Anahtarlar, kaynak belgede yazildiklari sirayi her yonde korur. Ne decode ne de encode tarafi Go map uzerinden gecer; map iterasyonu her calismada rastgelelestigi icin belge her donusumde farkli bir sirayla cikardi.
+
+```go
+out, _ := transformer.JsonToXml([]byte(`{"zebra":1,"apple":2}`))
+// her calismada <root><zebra>1</zebra><apple>2</apple></root>
+```
+
+### XML Tekrarli Element'ler
+
+Ayni ismi paylasan kardes element'ler tek bir array node'unda toplanir; array node'u da her deger icin bir element olarak geri yazilir. XML'in liste sozdizimi olmadigi icin bir listenin XML'den sag cikmasini saglayan sey budur.
+
+```go
+out, _ := transformer.XmlToJson([]byte(`<root><item>1</item><item>2</item></root>`))
+// {"item":[1,2]}
+```
+
+### XML Attribute ve Metin
+
+Attribute'lar `@ad` seklinde cocuk node olarak saklanir. Hem attribute hem metin tasiyan bir element, metnini `#text` cocugunda tutar; boylece ikisi birbirinin yerini almaz. Yalnizca metin tasiyan bir element duz string, sayi veya boolean olarak kalir.
+
+```go
+out, _ := transformer.XmlToJson([]byte(`<root id="5"><name lang="en">John</name></root>`))
+// {"@id":"5","name":{"@lang":"en","#text":"John"}}
+```
+
+Ayni yapi geri donusturuldugunde orijinal XML elde edilir.
+
 ### XML Namespace'leri
 
 Namespace prefix'leri uçtan uca korunur. `soap:Envelope` gibi bir element, Node'da `"soap:Envelope"` anahtariyla saklanir; namespace bildirimleri `@xmlns:soap` gibi attribute'lar olarak tutulur. Namespace'li bir XML belgesinin round-trip'i ayni ciktiy uretir.
@@ -181,7 +210,7 @@ Bu XML decode edildiginde key'i `"soap:Envelope"`, attribute'u `@xmlns:soap` ola
 
 ### JSON Buyuk Tamsayilar
 
-JSON sayilari `json.Decoder.UseNumber()` kullanilarak decode edilir; bu sayede buyuk tamsayilar tam olarak korunur. `float64` olarak kayipsiz temsil edilemeyen 2^53'ten buyuk sayilar dahili olarak string olarak saklanir ve JSON ciktisina oldugu gibi yazilir.
+JSON sayilari `json.Decoder.UseNumber()` ile decode edilir ve belgenin yazdigi metin olarak tutulur, hicbir zaman `float64` olarak degil. Bu yuzden 19 haneli bir kimlik 19 hanesiyle geri gelir, `1e10` da geldigi gosterimle geri doner.
 
 ```go
 // 9007199254740993 tam olarak korunur, float64 yuvarlamasi olmaz
@@ -206,6 +235,19 @@ production:
 ### Yuvalama Derinligi Siniri
 
 Tum decoder'lar maksimum 100 seviye yuvalama derinligini zorunlu kilar ve asildigi durumda hata doner. Bu, kotü niyetli girdilerde stack overflow'u onler.
+
+### Round-Trip'te Korunmayanlar
+
+Bir formatin yazdigi her seyin digerinde karsiligi yoktur. Asagidaki durumlarda deger farkli bir sekilde geri gelir; hepsi hedef formatin bir ozelligidir, kutuphanenin degil:
+
+- **XML uzerinden tek elemanli liste.** Tek bir `<item>` element'i, tekil bir element'ten ayirt edilemez; bu yuzden liste degil deger olarak geri gelir. Iki ve daha fazla elemanli liste korunur.
+- **XML uzerinden bos liste veya bos obje.** Ikisi de bos etiket olarak yazilir ve bos obje olarak geri gelir.
+- **XML uzerinden `null`.** XML'de null yoktur; element bos yazilir ve bos obje olarak geri gelir.
+- **Karisik icerikte metin konumu.** Cocuk element'lerin arasina serpistirilmis metin korunur, ancak geri yazilirken cocuk element'lerin arasina degil oncesine yazilir.
+- **YAML anchor sozdizimi.** Anchor ve alias'lar giriste cozumlenir, merge key (`<<`) yerinde genisletilir. Degerler dogrudur, sozdizimi geri yazilmaz.
+- **XML yorum ve isleme talimatlari.** Decode sirasinda atilir.
+
+JSON, XML ve YAML'in her biri kendi formati icinde Node modelinden degismeden gecer; XML icin yukarida sayilan istisnalar gecerlidir.
 
 ## Paket Yapısı
 

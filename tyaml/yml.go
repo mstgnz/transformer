@@ -1,18 +1,35 @@
 // Package tyaml provides functionality for handling YAML data using the Node structure.
 // It includes functions for reading, validating, encoding, and decoding YAML data.
+//
+// Both directions go through yaml.Node rather than through map[string]any.
+// A Go map has no order, and the output side used to reindent the encoder's
+// text by hand to compensate, which produced documents YAML itself could not
+// read back. yaml.Node keeps the document's own key order and lets the encoder
+// do the indenting.
+//
+// YAML anchors are resolved on the way in: an alias arrives as the value it
+// points at, and a merge key (<<) is expanded in place, with keys written
+// explicitly in the mapping winning over merged ones. The anchor syntax itself
+// is not preserved.
 package tyaml
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 
+	"github.com/mstgnz/transformer/internal/scalar"
 	"github.com/mstgnz/transformer/node"
 	"gopkg.in/yaml.v3"
 )
 
 const maxDepth = 100
+
+// maxAliasHops bounds alias chasing. yaml.v3 does not produce cyclic aliases,
+// but a hand-built node could, and an unbounded loop would hang rather than
+// fail.
+const maxAliasHops = 100
 
 // IsYaml checks if the given bytes are valid YAML
 func IsYaml(data []byte) bool {
@@ -39,13 +56,21 @@ func ReadYaml(filename string) ([]byte, error) {
 	return data, nil
 }
 
-// DecodeYaml decodes YAML bytes into a Node
+// DecodeYaml decodes YAML bytes into a Node.
+//
+// Mapping keys keep the order the document wrote them in.
 func DecodeYaml(data []byte) (*node.Node, error) {
-	var yamlData any
-	if err := yaml.Unmarshal(data, &yamlData); err != nil {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, err
 	}
-	return interfaceToNode("root", yamlData, 0)
+
+	// An empty document parses without error and without content.
+	if doc.Kind == 0 || len(doc.Content) == 0 {
+		return &node.Node{Key: "root", Value: &node.Value{Type: node.TypeNull}}, nil
+	}
+
+	return yamlToNode("root", doc.Content[0], 0)
 }
 
 // IsYml is an alias for IsYaml.
@@ -63,284 +88,317 @@ func ReadYml(filename string) ([]byte, error) { return ReadYaml(filename) }
 // Deprecated: use DecodeYaml.
 func DecodeYml(data []byte) (*node.Node, error) { return DecodeYaml(data) }
 
-// interfaceToNode converts an any to a Node with depth tracking.
-func interfaceToNode(key string, data any, depth int) (*node.Node, error) {
+// yamlToNode converts one YAML node into a Node with the given key.
+func yamlToNode(key string, y *yaml.Node, depth int) (*node.Node, error) {
+	n := &node.Node{Key: key}
+	value, err := yamlToValue(y, n, depth)
+	if err != nil {
+		return nil, err
+	}
+	n.Value = value
+	return n, nil
+}
+
+// yamlToValue converts one YAML node into a Value. owner is the node the value
+// will belong to, so mapping children can point back at their parent.
+func yamlToValue(y *yaml.Node, owner *node.Node, depth int) (*node.Value, error) {
 	if depth > maxDepth {
 		return nil, fmt.Errorf("max nesting depth %d exceeded", maxDepth)
 	}
 
-	if data == nil {
-		return &node.Node{
-			Key:   key,
-			Value: &node.Value{Type: node.TypeNull},
-		}, nil
+	y = resolveAlias(y)
+	if y == nil {
+		return &node.Value{Type: node.TypeNull}, nil
 	}
 
-	switch v := data.(type) {
-	case map[any]any:
-		n := &node.Node{
-			Key:   key,
-			Value: &node.Value{Type: node.TypeObject},
+	switch y.Kind {
+	case yaml.MappingNode:
+		return mappingToValue(y, owner, depth)
+	case yaml.SequenceNode:
+		return sequenceToValue(y, depth)
+	case yaml.ScalarNode:
+		return scalarToValue(y), nil
+	case yaml.DocumentNode:
+		if len(y.Content) == 0 {
+			return &node.Value{Type: node.TypeNull}, nil
 		}
-		var last *node.Node
-		for k, val := range v {
-			child, err := interfaceToNode(fmt.Sprint(k), val, depth+1)
-			if err != nil {
-				return nil, err
-			}
-			child.Parent = n
-			if last == nil {
-				n.Value.Node = child
-			} else {
-				last.Next = child
-				child.Prev = last
-			}
-			last = child
-		}
-		return n, nil
-
-	case map[string]any:
-		n := &node.Node{
-			Key:   key,
-			Value: &node.Value{Type: node.TypeObject},
-		}
-		var last *node.Node
-		for k, val := range v {
-			child, err := interfaceToNode(k, val, depth+1)
-			if err != nil {
-				return nil, err
-			}
-			child.Parent = n
-			if last == nil {
-				n.Value.Node = child
-			} else {
-				last.Next = child
-				child.Prev = last
-			}
-			last = child
-		}
-		return n, nil
-
-	case []any:
-		n := &node.Node{
-			Key:   key,
-			Value: &node.Value{Type: node.TypeArray, Array: make([]*node.Value, len(v))},
-		}
-		for i, item := range v {
-			if item == nil {
-				n.Value.Array[i] = &node.Value{Type: node.TypeNull}
-				continue
-			}
-			switch val := item.(type) {
-			case map[any]any, map[string]any:
-				child, err := interfaceToNode(fmt.Sprintf("item%d", i), val, depth+1)
-				if err != nil {
-					return nil, err
-				}
-				n.Value.Array[i] = &node.Value{Type: node.TypeObject, Node: child}
-			case []any:
-				child, err := interfaceToNode(fmt.Sprintf("item%d", i), val, depth+1)
-				if err != nil {
-					return nil, err
-				}
-				n.Value.Array[i] = child.Value
-			default:
-				n.Value.Array[i] = valueFromInterface(val)
-			}
-		}
-		return n, nil
-
-	case string:
-		return &node.Node{
-			Key:   key,
-			Value: &node.Value{Type: node.TypeString, Worth: v},
-		}, nil
-
-	case int:
-		return &node.Node{
-			Key:   key,
-			Value: &node.Value{Type: node.TypeNumber, Worth: strconv.Itoa(v)},
-		}, nil
-
-	case float64:
-		return &node.Node{
-			Key:   key,
-			Value: &node.Value{Type: node.TypeNumber, Worth: strconv.FormatFloat(v, 'f', -1, 64)},
-		}, nil
-
-	case bool:
-		return &node.Node{
-			Key:   key,
-			Value: &node.Value{Type: node.TypeBoolean, Worth: strconv.FormatBool(v)},
-		}, nil
-
-	default:
-		return &node.Node{
-			Key:   key,
-			Value: &node.Value{Type: node.TypeString, Worth: fmt.Sprint(v)},
-		}, nil
+		return yamlToValue(y.Content[0], owner, depth)
 	}
+
+	return &node.Value{Type: node.TypeNull}, nil
 }
 
-// valueFromInterface creates a Value from an any
-func valueFromInterface(data any) *node.Value {
-	if data == nil {
+// mappingToValue builds an object value, linking its members in document order.
+func mappingToValue(y *yaml.Node, owner *node.Node, depth int) (*node.Value, error) {
+	pairs, err := mappingPairs(y, depth)
+	if err != nil {
+		return nil, err
+	}
+
+	v := &node.Value{Type: node.TypeObject}
+	var last *node.Node
+	for _, p := range pairs {
+		child, err := yamlToNode(p.key, p.value, depth+1)
+		if err != nil {
+			return nil, err
+		}
+		child.Parent = owner
+		if last == nil {
+			v.Node = child
+		} else {
+			last.Next = child
+			child.Prev = last
+		}
+		last = child
+	}
+	return v, nil
+}
+
+// sequenceToValue builds an array value.
+func sequenceToValue(y *yaml.Node, depth int) (*node.Value, error) {
+	v := &node.Value{Type: node.TypeArray, Array: make([]*node.Value, 0, len(y.Content))}
+
+	for i, item := range y.Content {
+		resolved := resolveAlias(item)
+		if resolved == nil {
+			v.Array = append(v.Array, &node.Value{Type: node.TypeNull})
+			continue
+		}
+
+		// A mapping element is wrapped in a node so it keeps a key, which is
+		// what the XML writer names the repeated element after. Sequences and
+		// scalars are stored as the value itself.
+		if resolved.Kind == yaml.MappingNode {
+			child, err := yamlToNode(fmt.Sprintf("item%d", i), resolved, depth+1)
+			if err != nil {
+				return nil, err
+			}
+			v.Array = append(v.Array, &node.Value{Type: node.TypeObject, Node: child})
+			continue
+		}
+
+		value, err := yamlToValue(resolved, nil, depth+1)
+		if err != nil {
+			return nil, err
+		}
+		v.Array = append(v.Array, value)
+	}
+
+	return v, nil
+}
+
+// scalarToValue maps a YAML scalar onto a Value using the node's resolved tag.
+func scalarToValue(y *yaml.Node) *node.Value {
+	switch y.Tag {
+	case "!!null":
 		return &node.Value{Type: node.TypeNull}
+
+	case "!!bool":
+		if b, ok := scalar.Bool(y.Value); ok {
+			return &node.Value{Type: node.TypeBoolean, Worth: strconv.FormatBool(b)}
+		}
+		return &node.Value{Type: node.TypeString, Worth: y.Value}
+
+	case "!!int", "!!float":
+		if normalized, ok := scalar.Number(y.Value); ok {
+			return &node.Value{Type: node.TypeNumber, Worth: normalized}
+		}
+		return &node.Value{Type: node.TypeString, Worth: y.Value}
 	}
-	switch v := data.(type) {
-	case string:
-		return &node.Value{Type: node.TypeString, Worth: v}
-	case int:
-		return &node.Value{Type: node.TypeNumber, Worth: strconv.Itoa(v)}
-	case float64:
-		return &node.Value{Type: node.TypeNumber, Worth: strconv.FormatFloat(v, 'f', -1, 64)}
-	case bool:
-		return &node.Value{Type: node.TypeBoolean, Worth: strconv.FormatBool(v)}
-	default:
-		return &node.Value{Type: node.TypeString, Worth: fmt.Sprint(v)}
-	}
+
+	return &node.Value{Type: node.TypeString, Worth: y.Value}
 }
 
-// NodeToYaml converts a Node to YAML bytes
+// pair is one mapping member after merge keys have been expanded.
+type pair struct {
+	key   string
+	value *yaml.Node
+}
+
+// mappingPairs flattens a mapping into ordered members, expanding YAML merge
+// keys (<<) where they appear. A key written explicitly in the mapping wins
+// over the same key arriving through a merge, and among several merged sources
+// the first one wins, which is what the merge specification asks for.
+func mappingPairs(y *yaml.Node, depth int) ([]pair, error) {
+	if depth > maxDepth {
+		return nil, fmt.Errorf("max nesting depth %d exceeded", maxDepth)
+	}
+
+	explicit := make(map[string]bool)
+	for i := 0; i+1 < len(y.Content); i += 2 {
+		if y.Content[i].Tag != "!!merge" {
+			explicit[y.Content[i].Value] = true
+		}
+	}
+
+	var pairs []pair
+	added := make(map[string]bool)
+
+	for i := 0; i+1 < len(y.Content); i += 2 {
+		key, value := y.Content[i], y.Content[i+1]
+
+		if key.Tag == "!!merge" {
+			for _, source := range mergeSources(value) {
+				merged, err := mappingPairs(source, depth+1)
+				if err != nil {
+					return nil, err
+				}
+				for _, m := range merged {
+					if explicit[m.key] || added[m.key] {
+						continue
+					}
+					added[m.key] = true
+					pairs = append(pairs, m)
+				}
+			}
+			continue
+		}
+
+		// A duplicate key is invalid YAML. Keeping the first occurrence beats
+		// emitting the same key twice into JSON or XML further down the line.
+		if added[key.Value] {
+			continue
+		}
+		added[key.Value] = true
+		pairs = append(pairs, pair{key: key.Value, value: value})
+	}
+
+	return pairs, nil
+}
+
+// mergeSources returns the mappings a merge key points at. The value is either
+// one mapping (usually reached through an alias) or a sequence of them.
+func mergeSources(v *yaml.Node) []*yaml.Node {
+	v = resolveAlias(v)
+	if v == nil {
+		return nil
+	}
+
+	switch v.Kind {
+	case yaml.MappingNode:
+		return []*yaml.Node{v}
+	case yaml.SequenceNode:
+		var sources []*yaml.Node
+		for _, item := range v.Content {
+			if resolved := resolveAlias(item); resolved != nil && resolved.Kind == yaml.MappingNode {
+				sources = append(sources, resolved)
+			}
+		}
+		return sources
+	}
+	return nil
+}
+
+// resolveAlias follows an alias to the node it names.
+func resolveAlias(y *yaml.Node) *yaml.Node {
+	for hops := 0; y != nil && y.Kind == yaml.AliasNode; hops++ {
+		if hops >= maxAliasHops {
+			return nil
+		}
+		y = y.Alias
+	}
+	return y
+}
+
+// NodeToYaml converts a Node to YAML bytes.
 func NodeToYaml(n *node.Node) ([]byte, error) {
 	if n == nil {
 		return nil, fmt.Errorf("node is nil")
 	}
 
-	data := nodeToInterface(n)
-
-	yamlBytes, err := yaml.Marshal(data)
+	doc, err := valueToYaml(n.Value, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	// Normalize: remove empty lines and strip indentation from array items
-	lines := strings.Split(string(yamlBytes), "\n")
-	var formattedLines []string
-	var prevWasKey bool
-
-	for _, line := range lines {
-		trimmedLine := strings.TrimRight(line, " \t\n\r")
-		if trimmedLine == "" {
-			continue
-		}
-
-		stripped := strings.TrimLeft(trimmedLine, " \t")
-		if prevWasKey && strings.HasPrefix(stripped, "- ") {
-			formattedLines = append(formattedLines, stripped)
-		} else {
-			formattedLines = append(formattedLines, trimmedLine)
-		}
-
-		prevWasKey = strings.HasSuffix(stripped, ":")
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(doc); err != nil {
+		enc.Close()
+		return nil, err
 	}
-
-	if len(formattedLines) == 0 {
-		return []byte{}, nil
+	if err := enc.Close(); err != nil {
+		return nil, err
 	}
-
-	return []byte(strings.Join(formattedLines, "\n") + "\n"), nil
+	return buf.Bytes(), nil
 }
 
-// nodeToInterface converts a Node to interface{}
-func nodeToInterface(n *node.Node) any {
-	if n == nil {
-		return nil
+// valueToYaml builds the yaml.Node the encoder writes. Tags are set explicitly
+// so a number stays a number and a string that looks like one stays quoted.
+func valueToYaml(v *node.Value, depth int) (*yaml.Node, error) {
+	if depth > maxDepth {
+		return nil, fmt.Errorf("max nesting depth %d exceeded", maxDepth)
 	}
-
-	if n.Key == "root" {
-		if n.Value == nil {
-			return nil
-		}
-		if n.Value.Type == node.TypeArray {
-			return convertValue(n.Value)
-		}
-		if n.Value.Node == nil {
-			return nil
-		}
-		return nodeToMap(n.Value.Node)
-	}
-
-	return convertValue(n.Value)
-}
-
-// nodeToMap converts a Node to map[string]any
-func nodeToMap(n *node.Node) map[string]any {
-	result := make(map[string]any)
-	current := n
-
-	for current != nil {
-		if current.Value != nil {
-			switch current.Value.Type {
-			case node.TypeArray:
-				result[current.Key] = convertValue(current.Value)
-			case node.TypeObject:
-				if current.Value.Node != nil {
-					result[current.Key] = nodeToMap(current.Value.Node)
-				} else {
-					result[current.Key] = make(map[string]any)
-				}
-			default:
-				result[current.Key] = convertValue(current.Value)
-			}
-		}
-		current = current.Next
-	}
-
-	return result
-}
-
-// convertValue converts a Value to interface{}.
-// Integers are tried first to avoid float notation in YAML output.
-func convertValue(v *node.Value) any {
 	if v == nil {
-		return nil
+		return nullNode(), nil
 	}
 
 	switch v.Type {
-	case node.TypeNull:
-		return nil
-	case node.TypeString:
-		return v.Worth
-	case node.TypeNumber:
-		if i, err := strconv.ParseInt(v.Worth, 10, 64); err == nil {
-			return i
-		}
-		if u, err := strconv.ParseUint(v.Worth, 10, 64); err == nil {
-			return u
-		}
-		if f, err := strconv.ParseFloat(v.Worth, 64); err == nil {
-			return f
-		}
-		return v.Worth
-	case node.TypeBoolean:
-		b, _ := strconv.ParseBool(v.Worth)
-		return b
-	case node.TypeArray:
-		result := make([]any, 0)
-		for _, item := range v.Array {
-			if item != nil {
-				switch item.Type {
-				case node.TypeObject:
-					if item.Node != nil {
-						if item.Node.Value != nil {
-							result = append(result, convertValue(item.Node.Value))
-						} else {
-							result = append(result, item.Worth)
-						}
-					}
-				default:
-					result = append(result, item.Worth)
-				}
-			}
-		}
-		return result
 	case node.TypeObject:
-		if v.Node == nil {
-			return make(map[string]any)
+		y := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		for current := v.Node; current != nil; current = current.Next {
+			value, err := valueToYaml(current.Value, depth+1)
+			if err != nil {
+				return nil, err
+			}
+			y.Content = append(y.Content,
+				&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: current.Key},
+				value)
 		}
-		return nodeToMap(v.Node)
-	default:
-		return v.Worth
+		return y, nil
+
+	case node.TypeArray:
+		y := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+		for _, item := range v.Array {
+			value, err := valueToYaml(itemValue(item), depth+1)
+			if err != nil {
+				return nil, err
+			}
+			y.Content = append(y.Content, value)
+		}
+		return y, nil
+
+	case node.TypeString:
+		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v.Worth}, nil
+
+	case node.TypeNumber:
+		normalized, ok := scalar.Number(v.Worth)
+		if !ok {
+			return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v.Worth}, nil
+		}
+		tag := "!!float"
+		if scalar.IsInteger(normalized) {
+			tag = "!!int"
+		}
+		return &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Value: normalized}, nil
+
+	case node.TypeBoolean:
+		value := "false"
+		if b, ok := scalar.Bool(v.Worth); ok && b {
+			value = "true"
+		}
+		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: value}, nil
+
+	case node.TypeNull:
+		return nullNode(), nil
 	}
+
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v.Worth}, nil
+}
+
+// itemValue unwraps an array element. Object elements carry a wrapper node
+// whose key names the element; everything else is stored directly.
+func itemValue(item *node.Value) *node.Value {
+	if item == nil {
+		return nil
+	}
+	if item.Node != nil && item.Type == node.TypeObject {
+		return item.Node.Value
+	}
+	return item
+}
+
+func nullNode() *yaml.Node {
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!null", Value: "null"}
 }

@@ -1,6 +1,6 @@
 # Transformer
 
-Transformer is a Go library that enables conversion between different data formats (JSON, XML, YAML). Using a common data structure, you can perform lossless conversions between these formats.
+Transformer is a Go library that enables conversion between different data formats (JSON, XML, YAML). A document is decoded into one common tree, and every writer reads that tree, so key order, value types and repeated elements survive the trip. What each format cannot express is listed under [Format-Specific Behavior](#format-specific-behavior).
 
 [Turkish Documentation (Türkçe Dokümantasyon)](README_TR.md)
 
@@ -167,6 +167,35 @@ jsonData, _ := tjson.NodeToJson(node)
 
 ## Format-Specific Behavior
 
+### Key Order
+
+Keys keep the order the source document wrote them in, in every direction. Neither decoding nor encoding goes through a Go map, because map iteration is randomized per run and would reshuffle the document differently on every conversion.
+
+```go
+out, _ := transformer.JsonToXml([]byte(`{"zebra":1,"apple":2}`))
+// <root><zebra>1</zebra><apple>2</apple></root>, on every run
+```
+
+### XML Repeated Elements
+
+Sibling elements sharing a name are collected into one array node, and an array node is written back as one element per value. This is what lets a list survive XML, which has no syntax for one.
+
+```go
+out, _ := transformer.XmlToJson([]byte(`<root><item>1</item><item>2</item></root>`))
+// {"item":[1,2]}
+```
+
+### XML Attributes and Text
+
+Attributes are stored as `@name` child nodes. An element carrying both attributes and text keeps its text in a `#text` child, so neither displaces the other. An element carrying only text stays a plain string, number or boolean.
+
+```go
+out, _ := transformer.XmlToJson([]byte(`<root id="5"><name lang="en">John</name></root>`))
+// {"@id":"5","name":{"@lang":"en","#text":"John"}}
+```
+
+The same shape converts back to the original XML.
+
 ### XML Namespaces
 
 Namespace prefixes are preserved end-to-end. An element `soap:Envelope` is stored in the Node with key `"soap:Envelope"`, and namespace declarations are stored as `@xmlns:soap` attributes. Round-tripping a namespaced XML document produces identical output.
@@ -181,7 +210,7 @@ decodes to a Node whose key is `"soap:Envelope"` with an `@xmlns:soap` attribute
 
 ### JSON Large Integers
 
-JSON numbers are decoded using `json.Decoder.UseNumber()`, which preserves large integers exactly. Numbers larger than 2^53 that cannot be represented as `float64` without precision loss are kept as strings internally and written back as-is to JSON output.
+JSON numbers are decoded using `json.Decoder.UseNumber()` and held as the text the document wrote, never as `float64`. A 19-digit identifier therefore comes back with all 19 digits, and `1e10` comes back in the notation it arrived in.
 
 ```go
 // 9007199254740993 is preserved exactly - no float64 rounding
@@ -206,6 +235,19 @@ production:
 ### Nesting Depth Limit
 
 All decoders enforce a maximum nesting depth of 100 levels and return an error if exceeded. This prevents stack overflows on pathological inputs.
+
+### What a Round Trip Does Not Preserve
+
+Some of what one format writes has no counterpart in another. These are the cases where a value comes back in a different shape, all of them a property of the target format rather than of this library:
+
+- **A one-element list through XML.** One `<item>` element is indistinguishable from a single element, so it comes back as a value rather than a list. A list of two or more survives.
+- **An empty list or empty object through XML.** Both are written as an empty tag and come back as an empty object.
+- **`null` through XML.** XML has no null; the element is written empty and comes back as an empty object.
+- **Mixed content position.** Text interleaved with child elements is kept, but the text runs are written back before the child elements rather than between them.
+- **YAML anchor syntax.** Anchors and aliases are resolved on the way in, and merge keys (`<<`) are expanded in place. The values are correct; the syntax is not written back.
+- **XML comments and processing instructions.** Dropped during decode.
+
+JSON, XML and YAML each round-trip through the Node model unchanged within their own format, with the XML exceptions listed above.
 
 ## Package Structure
 

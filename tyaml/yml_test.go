@@ -2,10 +2,12 @@ package tyaml
 
 import (
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/mstgnz/transformer/node"
+	"gopkg.in/yaml.v3"
 )
 
 // ---- IsYml / IsYaml ----
@@ -465,168 +467,233 @@ func TestNodeToYaml_ArrayOfObjects(t *testing.T) {
 	}
 }
 
-// ---- interfaceToNode direct coverage ----
+// ---- scalarToValue: tag to type mapping ----
 
-func TestInterfaceToNode_DirectCoverage(t *testing.T) {
-	// nil data hits the nil branch
-	n, err := interfaceToNode("key", nil, 0)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if n == nil || n.Value.Type != node.TypeNull {
-		t.Errorf("expected TypeNull for nil, got %v", n)
-	}
-
-	// map[any]any path (yaml v1 compat)
-	m := map[any]any{"name": "alice", "age": 30}
-	n2, err := interfaceToNode("root", m, 0)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if n2 == nil || n2.Value.Type != node.TypeObject {
-		t.Errorf("expected TypeObject for map[any]any, got %v", n2)
-	}
-
-	// default case with unknown type
-	n3, err := interfaceToNode("key", struct{ X int }{X: 1}, 0)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if n3 == nil || n3.Value.Type != node.TypeString {
-		t.Errorf("expected TypeString for unknown type, got %v", n3)
-	}
-
-	// array with map[any]any item
-	arr := []any{map[any]any{"k": "v"}}
-	n4, err := interfaceToNode("arr", arr, 0)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if n4 == nil || n4.Value.Type != node.TypeArray {
-		t.Errorf("expected TypeArray, got %v", n4)
-	}
-
-	// depth exceeded
-	_, err = interfaceToNode("key", "val", maxDepth+1)
-	if err == nil {
-		t.Error("expected error for exceeded depth")
-	}
-}
-
-// ---- valueFromInterface direct coverage ----
-
-func TestValueFromInterface(t *testing.T) {
+func TestScalarToValue(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    any
-		wantType node.ValueType
+		name      string
+		tag       string
+		value     string
+		wantType  node.ValueType
 		wantWorth string
 	}{
-		{"nil", nil, node.TypeNull, ""},
-		{"string", "hello", node.TypeString, "hello"},
-		{"int", 42, node.TypeNumber, "42"},
-		{"float64", 3.14, node.TypeNumber, "3.14"},
-		{"bool true", true, node.TypeBoolean, "true"},
-		{"bool false", false, node.TypeBoolean, "false"},
-		{"unknown type", struct{}{}, node.TypeString, "{}"},
+		{"null", "!!null", "null", node.TypeNull, ""},
+		{"bool true", "!!bool", "true", node.TypeBoolean, "true"},
+		{"bool yes", "!!bool", "yes", node.TypeBoolean, "true"},
+		{"bool off", "!!bool", "off", node.TypeBoolean, "false"},
+		{"int", "!!int", "42", node.TypeNumber, "42"},
+		{"int hex", "!!int", "0x1F", node.TypeNumber, "31"},
+		{"int underscores", "!!int", "1_000", node.TypeNumber, "1000"},
+		{"big int keeps digits", "!!int", "9007199254740993", node.TypeNumber, "9007199254740993"},
+		{"float", "!!float", "3.14", node.TypeNumber, "3.14"},
+		{"float exponent kept", "!!float", "1e10", node.TypeNumber, "1e10"},
+		{"infinity is not a number", "!!float", ".inf", node.TypeString, ".inf"},
+		{"string", "!!str", "hello", node.TypeString, "hello"},
+		{"timestamp falls back to string", "!!timestamp", "2026-08-28", node.TypeString, "2026-08-28"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := valueFromInterface(tt.input)
-			if v == nil {
-				t.Fatal("valueFromInterface returned nil")
+			got := scalarToValue(&yaml.Node{Kind: yaml.ScalarNode, Tag: tt.tag, Value: tt.value})
+			if got.Type != tt.wantType {
+				t.Errorf("type = %v, want %v", got.Type, tt.wantType)
 			}
-			if v.Type != tt.wantType {
-				t.Errorf("type = %v, want %v", v.Type, tt.wantType)
+			if got.Worth != tt.wantWorth {
+				t.Errorf("worth = %q, want %q", got.Worth, tt.wantWorth)
 			}
 		})
 	}
 }
 
-// ---- convertValue direct coverage ----
+// ---- resolveAlias ----
 
-func TestConvertValue(t *testing.T) {
-	// nil value
-	if got := convertValue(nil); got != nil {
-		t.Errorf("convertValue(nil) = %v, want nil", got)
+func TestResolveAlias(t *testing.T) {
+	target := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "target"}
+	alias := &yaml.Node{Kind: yaml.AliasNode, Alias: target}
+	if got := resolveAlias(alias); got != target {
+		t.Errorf("resolveAlias did not reach the anchored node, got %v", got)
 	}
 
-	// TypeObject with no node
-	v := &node.Value{Type: node.TypeObject}
-	if got := convertValue(v); got == nil {
-		t.Errorf("convertValue(TypeObject nil node) should return empty map")
+	// A hand-built cycle must fail rather than hang.
+	loop := &yaml.Node{Kind: yaml.AliasNode}
+	loop.Alias = loop
+	if got := resolveAlias(loop); got != nil {
+		t.Errorf("resolveAlias on a cyclic alias = %v, want nil", got)
 	}
 
-	// TypeObject with node
-	v2 := &node.Value{
+	if got := resolveAlias(nil); got != nil {
+		t.Errorf("resolveAlias(nil) = %v, want nil", got)
+	}
+}
+
+// ---- mappingPairs: order and merge precedence ----
+
+func TestMappingPairs_KeepsDocumentOrder(t *testing.T) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte("z: 1\na: 2\nm: 3\n"), &doc); err != nil {
+		t.Fatalf("Unmarshal error: %v", err)
+	}
+	pairs, err := mappingPairs(doc.Content[0], 0)
+	if err != nil {
+		t.Fatalf("mappingPairs error: %v", err)
+	}
+	want := []string{"z", "a", "m"}
+	if len(pairs) != len(want) {
+		t.Fatalf("got %d pairs, want %d", len(pairs), len(want))
+	}
+	for i, key := range want {
+		if pairs[i].key != key {
+			t.Errorf("pair %d = %q, want %q", i, pairs[i].key, key)
+		}
+	}
+}
+
+func TestMappingPairs_ExplicitKeyBeatsMerge(t *testing.T) {
+	input := []byte(`
+base: &base
+  timeout: 30
+  retries: 3
+override:
+  <<: *base
+  timeout: 99
+`)
+	var doc yaml.Node
+	if err := yaml.Unmarshal(input, &doc); err != nil {
+		t.Fatalf("Unmarshal error: %v", err)
+	}
+
+	var override *yaml.Node
+	top := doc.Content[0]
+	for i := 0; i+1 < len(top.Content); i += 2 {
+		if top.Content[i].Value == "override" {
+			override = top.Content[i+1]
+		}
+	}
+	if override == nil {
+		t.Fatal("override mapping not found")
+	}
+
+	pairs, err := mappingPairs(override, 0)
+	if err != nil {
+		t.Fatalf("mappingPairs error: %v", err)
+	}
+
+	got := make(map[string]string, len(pairs))
+	for _, p := range pairs {
+		got[p.key] = p.value.Value
+	}
+	if got["timeout"] != "99" {
+		t.Errorf("explicit key lost to merge: timeout = %q, want 99", got["timeout"])
+	}
+	if got["retries"] != "3" {
+		t.Errorf("merged key missing: retries = %q, want 3", got["retries"])
+	}
+	if len(pairs) != 2 {
+		t.Errorf("got %d pairs, want 2 (timeout and retries, each once)", len(pairs))
+	}
+}
+
+func TestMappingPairs_MergeSequenceFirstWins(t *testing.T) {
+	input := []byte(`
+a: &a
+  shared: from-a
+b: &b
+  shared: from-b
+  only-b: yes
+merged:
+  <<: [*a, *b]
+`)
+	var doc yaml.Node
+	if err := yaml.Unmarshal(input, &doc); err != nil {
+		t.Fatalf("Unmarshal error: %v", err)
+	}
+
+	n, err := DecodeYaml(input)
+	if err != nil {
+		t.Fatalf("DecodeYaml error: %v", err)
+	}
+
+	var merged *node.Node
+	for cur := n.Value.Node; cur != nil; cur = cur.Next {
+		if cur.Key == "merged" {
+			merged = cur
+		}
+	}
+	if merged == nil {
+		t.Fatal("merged mapping not found")
+	}
+
+	values := make(map[string]string)
+	for cur := merged.Value.Node; cur != nil; cur = cur.Next {
+		values[cur.Key] = cur.Value.Worth
+	}
+	if values["shared"] != "from-a" {
+		t.Errorf("shared = %q, want from-a (the first source in the merge list)", values["shared"])
+	}
+	if _, ok := values["only-b"]; !ok {
+		t.Error("key only present in the second merge source was dropped")
+	}
+}
+
+// ---- valueToYaml: tags written for the encoder ----
+
+func TestValueToYaml_Tags(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   *node.Value
+		wantTag string
+		wantVal string
+	}{
+		{"nil is null", nil, "!!null", "null"},
+		{"null", &node.Value{Type: node.TypeNull}, "!!null", "null"},
+		{"string", &node.Value{Type: node.TypeString, Worth: "x"}, "!!str", "x"},
+		{"string that looks numeric", &node.Value{Type: node.TypeString, Worth: "42"}, "!!str", "42"},
+		{"integer", &node.Value{Type: node.TypeNumber, Worth: "42"}, "!!int", "42"},
+		{"float", &node.Value{Type: node.TypeNumber, Worth: "3.14"}, "!!float", "3.14"},
+		{"unparseable number becomes text", &node.Value{Type: node.TypeNumber, Worth: "not-a-number"}, "!!str", "not-a-number"},
+		{"boolean", &node.Value{Type: node.TypeBoolean, Worth: "true"}, "!!bool", "true"},
+		{"boolean from yaml spelling", &node.Value{Type: node.TypeBoolean, Worth: "yes"}, "!!bool", "true"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := valueToYaml(tt.value, 0)
+			if err != nil {
+				t.Fatalf("valueToYaml error: %v", err)
+			}
+			if got.Tag != tt.wantTag {
+				t.Errorf("tag = %q, want %q", got.Tag, tt.wantTag)
+			}
+			if got.Value != tt.wantVal {
+				t.Errorf("value = %q, want %q", got.Value, tt.wantVal)
+			}
+		})
+	}
+}
+
+func TestValueToYaml_DepthLimit(t *testing.T) {
+	if _, err := valueToYaml(&node.Value{Type: node.TypeString, Worth: "x"}, maxDepth+1); err == nil {
+		t.Error("expected error past the depth limit")
+	}
+}
+
+// ---- itemValue ----
+
+func TestItemValue(t *testing.T) {
+	if got := itemValue(nil); got != nil {
+		t.Errorf("itemValue(nil) = %v, want nil", got)
+	}
+
+	scalarItem := &node.Value{Type: node.TypeString, Worth: "x"}
+	if got := itemValue(scalarItem); got != scalarItem {
+		t.Error("a scalar element should be returned as it is stored")
+	}
+
+	inner := &node.Value{
 		Type: node.TypeObject,
-		Node: &node.Node{
-			Key:   "key",
-			Value: &node.Value{Type: node.TypeString, Worth: "val"},
-		},
+		Node: &node.Node{Key: "k", Value: &node.Value{Type: node.TypeString, Worth: "v"}},
 	}
-	got2 := convertValue(v2)
-	if got2 == nil {
-		t.Errorf("convertValue(TypeObject with node) returned nil")
-	}
-
-	// TypeArray with TypeObject item
-	childNode := &node.Node{
-		Key: "item0",
-		Value: &node.Value{
-			Type: node.TypeObject,
-			Node: &node.Node{
-				Key:   "x",
-				Value: &node.Value{Type: node.TypeString, Worth: "y"},
-			},
-		},
-	}
-	v3 := &node.Value{
-		Type: node.TypeArray,
-		Array: []*node.Value{
-			{Type: node.TypeObject, Node: childNode},
-		},
-	}
-	got3 := convertValue(v3)
-	if got3 == nil {
-		t.Errorf("convertValue(TypeArray with object) returned nil")
-	}
-
-	// TypeArray with item where Node.Value is nil
-	childNodeNilVal := &node.Node{Key: "item0", Value: nil}
-	v4 := &node.Value{
-		Type: node.TypeArray,
-		Array: []*node.Value{
-			{Type: node.TypeObject, Node: childNodeNilVal, Worth: "fallback"},
-		},
-	}
-	got4 := convertValue(v4)
-	if got4 == nil {
-		t.Errorf("convertValue(TypeArray nil item value) returned nil")
-	}
-
-	// TypeNumber ParseInt fallback
-	v5 := &node.Value{Type: node.TypeNumber, Worth: "9007199254740993"}
-	got5 := convertValue(v5)
-	if got5 == nil {
-		t.Errorf("convertValue(TypeNumber int64) returned nil")
-	}
-
-	// TypeNumber full fallback to string
-	v6 := &node.Value{Type: node.TypeNumber, Worth: "not-a-number"}
-	got6 := convertValue(v6)
-	if got6 == nil {
-		t.Errorf("convertValue(TypeNumber string fallback) returned nil")
-	}
-
-	// nil item in array
-	v7 := &node.Value{
-		Type:  node.TypeArray,
-		Array: []*node.Value{nil},
-	}
-	got7 := convertValue(v7)
-	if got7 == nil {
-		t.Errorf("convertValue(TypeArray with nil item) returned nil")
+	wrapped := &node.Value{Type: node.TypeObject, Node: &node.Node{Key: "item0", Value: inner}}
+	if got := itemValue(wrapped); got != inner {
+		t.Error("an object element should be unwrapped to the object it holds")
 	}
 }
 
@@ -719,5 +786,314 @@ func TestNodeToYaml_RootWithNestedObject(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "debug") {
 		t.Errorf("expected 'debug' in output, got: %s", string(out))
+	}
+}
+
+// ---- Output must be readable YAML ----
+
+// TestNodeToYaml_OutputIsValidYaml is the regression test for the hand-rolled
+// indentation the writer used to apply. Any document holding a sequence came
+// out with the first item at column zero and the rest where the encoder had put
+// them, which YAML cannot parse.
+func TestNodeToYaml_OutputIsValidYaml(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+	}{
+		{"flat mapping", "a: 1\nb: x\n"},
+		{"one item sequence", "a:\n  - 1\n"},
+		{"two item sequence", "a:\n  - 1\n  - 2\n"},
+		{"sequence under a nested key", "o:\n  a:\n    - 1\n    - 2\n"},
+		{"sequence of mappings", "users:\n  - name: alice\n  - name: bob\n"},
+		{"sequence of sequences", "matrix:\n  - - 1\n    - 2\n  - - 3\n"},
+		{"deeply nested", "a:\n  b:\n    c:\n      - x\n      - y\n"},
+		{"top level sequence", "- 1\n- 2\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n, err := DecodeYaml([]byte(tt.yaml))
+			if err != nil {
+				t.Fatalf("DecodeYaml error: %v", err)
+			}
+			out, err := NodeToYaml(n)
+			if err != nil {
+				t.Fatalf("NodeToYaml error: %v", err)
+			}
+
+			var reparsed any
+			if err := yaml.Unmarshal(out, &reparsed); err != nil {
+				t.Fatalf("NodeToYaml produced YAML that cannot be read back: %v\noutput:\n%s", err, out)
+			}
+
+			// The document itself must survive, not merely parse.
+			var original any
+			if err := yaml.Unmarshal([]byte(tt.yaml), &original); err != nil {
+				t.Fatalf("test input is not valid YAML: %v", err)
+			}
+			if !reflect.DeepEqual(reparsed, original) {
+				t.Errorf("round trip changed the document\ngot:  %#v\nwant: %#v\noutput:\n%s", reparsed, original, out)
+			}
+		})
+	}
+}
+
+// TestNodeToYaml_ArrayScalarsKeepType covers values inside a sequence, which
+// used to be written as their raw text and came back as strings.
+func TestNodeToYaml_ArrayScalarsKeepType(t *testing.T) {
+	n, err := DecodeYaml([]byte("nums:\n  - 1\n  - 2\nflags:\n  - true\n  - false\nwords:\n  - a\n"))
+	if err != nil {
+		t.Fatalf("DecodeYaml error: %v", err)
+	}
+	out, err := NodeToYaml(n)
+	if err != nil {
+		t.Fatalf("NodeToYaml error: %v", err)
+	}
+
+	var got map[string][]any
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatalf("output is not valid YAML: %v\n%s", err, out)
+	}
+
+	if len(got["nums"]) != 2 {
+		t.Fatalf("nums = %#v", got["nums"])
+	}
+	for i, v := range got["nums"] {
+		if _, ok := v.(int); !ok {
+			t.Errorf("nums[%d] = %#v, want an integer", i, v)
+		}
+	}
+	for i, v := range got["flags"] {
+		if _, ok := v.(bool); !ok {
+			t.Errorf("flags[%d] = %#v, want a boolean", i, v)
+		}
+	}
+	if s, ok := got["words"][0].(string); !ok || s != "a" {
+		t.Errorf("words[0] = %#v, want the string a", got["words"][0])
+	}
+}
+
+// TestNodeToYaml_NumericStringStaysQuoted checks the other direction: text that
+// looks like a number must not turn into one.
+func TestNodeToYaml_NumericStringStaysQuoted(t *testing.T) {
+	n := &node.Node{
+		Key: "root",
+		Value: &node.Value{
+			Type: node.TypeObject,
+			Node: &node.Node{
+				Key:   "zip",
+				Value: &node.Value{Type: node.TypeString, Worth: "01234"},
+			},
+		},
+	}
+	out, err := NodeToYaml(n)
+	if err != nil {
+		t.Fatalf("NodeToYaml error: %v", err)
+	}
+
+	var got map[string]any
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatalf("output is not valid YAML: %v\n%s", err, out)
+	}
+	if s, ok := got["zip"].(string); !ok || s != "01234" {
+		t.Errorf("zip = %#v, want the string 01234", got["zip"])
+	}
+}
+
+// ---- Key order ----
+
+func TestDecodeYaml_PreservesKeyOrder(t *testing.T) {
+	n, err := DecodeYaml([]byte("zebra: 1\napple: 2\nmango: 3\nbeta: 4\n"))
+	if err != nil {
+		t.Fatalf("DecodeYaml error: %v", err)
+	}
+
+	want := []string{"zebra", "apple", "mango", "beta"}
+	var got []string
+	for current := n.Value.Node; current != nil; current = current.Next {
+		got = append(got, current.Key)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("key order = %v, want %v", got, want)
+	}
+}
+
+func TestNodeToYaml_OutputIsDeterministic(t *testing.T) {
+	input := []byte("zebra: 1\napple: 2\nmango: 3\nbeta: 4\nkilo: 5\n")
+
+	var first string
+	for i := 0; i < 25; i++ {
+		n, err := DecodeYaml(input)
+		if err != nil {
+			t.Fatalf("DecodeYaml error: %v", err)
+		}
+		out, err := NodeToYaml(n)
+		if err != nil {
+			t.Fatalf("NodeToYaml error: %v", err)
+		}
+		if i == 0 {
+			first = string(out)
+			continue
+		}
+		if string(out) != first {
+			t.Fatalf("output changed between runs:\nrun 0:\n%s\nrun %d:\n%s", first, i, out)
+		}
+	}
+	if first != string(input) {
+		t.Errorf("output = %q, want the input order back: %q", first, input)
+	}
+}
+
+// ---- Nested sequences on the way in ----
+
+func TestDecodeYaml_NestedSequence(t *testing.T) {
+	n, err := DecodeYaml([]byte("matrix:\n  - - 1\n    - 2\n  - - 3\n"))
+	if err != nil {
+		t.Fatalf("DecodeYaml error: %v", err)
+	}
+
+	matrix := n.Value.Node
+	if matrix == nil || matrix.Value.Type != node.TypeArray {
+		t.Fatalf("expected an array node, got %v", matrix)
+	}
+	if len(matrix.Value.Array) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(matrix.Value.Array))
+	}
+	if matrix.Value.Array[0].Type != node.TypeArray {
+		t.Fatalf("expected the first row to stay an array, got %v", matrix.Value.Array[0].Type)
+	}
+	if len(matrix.Value.Array[0].Array) != 2 {
+		t.Errorf("first row = %+v, want 2 values", matrix.Value.Array[0].Array)
+	}
+}
+
+// ---- Empty input ----
+
+func TestDecodeYaml_Empty(t *testing.T) {
+	n, err := DecodeYaml([]byte(""))
+	if err != nil {
+		t.Fatalf("DecodeYaml error: %v", err)
+	}
+	if n == nil || n.Value == nil || n.Value.Type != node.TypeNull {
+		t.Errorf("empty document = %v, want a null root", n)
+	}
+}
+
+// ---- yamlToValue edge cases ----
+
+func TestYamlToValue_DocumentNode(t *testing.T) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte("key: value\n"), &doc); err != nil {
+		t.Fatalf("Unmarshal error: %v", err)
+	}
+
+	// The document node itself, not its content, to cover the unwrapping branch.
+	got, err := yamlToValue(&doc, nil, 0)
+	if err != nil {
+		t.Fatalf("yamlToValue error: %v", err)
+	}
+	if got.Type != node.TypeObject || got.Node == nil || got.Node.Key != "key" {
+		t.Errorf("document node was not unwrapped: %+v", got)
+	}
+
+	empty := &yaml.Node{Kind: yaml.DocumentNode}
+	got2, err := yamlToValue(empty, nil, 0)
+	if err != nil {
+		t.Fatalf("yamlToValue error: %v", err)
+	}
+	if got2.Type != node.TypeNull {
+		t.Errorf("empty document = %v, want null", got2.Type)
+	}
+}
+
+func TestYamlToValue_UnknownKind(t *testing.T) {
+	got, err := yamlToValue(&yaml.Node{}, nil, 0)
+	if err != nil {
+		t.Fatalf("yamlToValue error: %v", err)
+	}
+	if got.Type != node.TypeNull {
+		t.Errorf("unknown kind = %v, want null", got.Type)
+	}
+}
+
+func TestYamlToValue_DepthLimit(t *testing.T) {
+	n := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "x"}
+	if _, err := yamlToValue(n, nil, maxDepth+1); err == nil {
+		t.Error("expected an error past the depth limit")
+	}
+}
+
+func TestDecodeYaml_DepthLimit(t *testing.T) {
+	depth := 110
+	doc := ""
+	for i := 0; i < depth; i++ {
+		doc += strings.Repeat(" ", i*2) + "k:\n"
+	}
+	doc += strings.Repeat(" ", depth*2) + "v\n"
+	if _, err := DecodeYaml([]byte(doc)); err == nil {
+		t.Error("expected an error for a deeply nested document")
+	}
+}
+
+func TestSequenceToValue_AliasElements(t *testing.T) {
+	input := []byte("base: &base\n  k: v\nlist:\n  - *base\n  - plain\n")
+	n, err := DecodeYaml(input)
+	if err != nil {
+		t.Fatalf("DecodeYaml error: %v", err)
+	}
+
+	var list *node.Node
+	for cur := n.Value.Node; cur != nil; cur = cur.Next {
+		if cur.Key == "list" {
+			list = cur
+		}
+	}
+	if list == nil || list.Value.Type != node.TypeArray {
+		t.Fatalf("list not found or not an array: %v", list)
+	}
+	if len(list.Value.Array) != 2 {
+		t.Fatalf("expected 2 elements, got %d", len(list.Value.Array))
+	}
+	if list.Value.Array[0].Node == nil {
+		t.Fatal("the aliased element did not resolve to the mapping it names")
+	}
+	if got := list.Value.Array[0].Node.Value.Node; got == nil || got.Key != "k" {
+		t.Errorf("aliased mapping = %v, want the key k", got)
+	}
+	if list.Value.Array[1].Worth != "plain" {
+		t.Errorf("second element = %q, want plain", list.Value.Array[1].Worth)
+	}
+}
+
+func TestMergeSources_NonMapping(t *testing.T) {
+	// A merge key pointing at something that is not a mapping contributes
+	// nothing rather than breaking the decode.
+	if got := mergeSources(&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "x"}); got != nil {
+		t.Errorf("mergeSources(scalar) = %v, want nil", got)
+	}
+	if got := mergeSources(nil); got != nil {
+		t.Errorf("mergeSources(nil) = %v, want nil", got)
+	}
+
+	sequence := &yaml.Node{Kind: yaml.SequenceNode, Content: []*yaml.Node{
+		{Kind: yaml.MappingNode},
+		{Kind: yaml.ScalarNode, Tag: "!!str", Value: "ignored"},
+	}}
+	if got := mergeSources(sequence); len(got) != 1 {
+		t.Errorf("mergeSources(sequence) returned %d mappings, want 1", len(got))
+	}
+}
+
+func TestNodeToYaml_DepthLimit(t *testing.T) {
+	root := &node.Node{Key: "root", Value: &node.Value{Type: node.TypeObject}}
+	current := root
+	for i := 0; i <= maxDepth+2; i++ {
+		child := &node.Node{Key: "a", Value: &node.Value{Type: node.TypeObject}}
+		current.Value.Node = child
+		child.Parent = current
+		current = child
+	}
+	if _, err := NodeToYaml(root); err == nil {
+		t.Error("expected an error past the depth limit")
 	}
 }
