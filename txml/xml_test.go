@@ -728,7 +728,9 @@ func TestNodeToXml_ArrayWritesOneElementPerValue(t *testing.T) {
 	}
 }
 
-func TestNodeToXml_EmptyArrayKeepsTheTag(t *testing.T) {
+// TestNodeToXml_EmptyListIsMarked covers the list XML has no room for. An empty
+// tag on its own would read back as an empty object, so the writer marks it.
+func TestNodeToXml_EmptyListIsMarked(t *testing.T) {
 	n := &node.Node{
 		Key: "root",
 		Value: &node.Value{
@@ -743,8 +745,21 @@ func TestNodeToXml_EmptyArrayKeepsTheTag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NodeToXml error: %v", err)
 	}
-	if got := normalizeXml(string(out)); got != `<root><tags/></root>` {
-		t.Errorf("got: %s, want <root><tags/></root>", got)
+	want := `<root xmlns:t="` + markerNamespace + `"><tags t:type="array"/></root>`
+	if got := normalizeXml(string(out)); got != want {
+		t.Errorf("got:  %s\nwant: %s", got, want)
+	}
+
+	back, err := DecodeXml(out)
+	if err != nil {
+		t.Fatalf("DecodeXml error: %v", err)
+	}
+	tags := back.Value.Node
+	if tags == nil || tags.Key != "tags" {
+		t.Fatalf("expected a 'tags' node, got %v", tags)
+	}
+	if tags.Value.Type != node.TypeArray || len(tags.Value.Array) != 0 {
+		t.Errorf("tags = %+v, want an empty list", tags.Value)
 	}
 }
 
@@ -763,9 +778,19 @@ func TestNodeToXml_RootArray(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NodeToXml error: %v", err)
 	}
-	want := `<root><item>1</item><item>2</item></root>`
+	// A document has one root element, so a root list can never travel as
+	// repeated elements and always carries the marker.
+	want := `<root xmlns:t="` + markerNamespace + `" t:type="array"><item>1</item><item>2</item></root>`
 	if got := normalizeXml(string(out)); got != want {
 		t.Errorf("got:  %s\nwant: %s", got, want)
+	}
+
+	back, err := DecodeXml(out)
+	if err != nil {
+		t.Fatalf("DecodeXml error: %v", err)
+	}
+	if back.Value.Type != node.TypeArray || len(back.Value.Array) != 2 {
+		t.Errorf("root = %+v, want a list of 2", back.Value)
 	}
 }
 
@@ -846,8 +871,8 @@ func TestDecodeXml_MixedContent(t *testing.T) {
 
 // ---- Nested lists ----
 
-// TestNodeToXml_NestedArray covers a list of lists, which XML has no name for.
-// The inner values are written as <item> elements so nothing disappears.
+// TestNodeToXml_NestedArray covers a list of lists. XML has no name for the
+// inner one, so both levels are marked and the values are written as <item>.
 func TestNodeToXml_NestedArray(t *testing.T) {
 	n := &node.Node{
 		Key: "root",
@@ -871,9 +896,23 @@ func TestNodeToXml_NestedArray(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NodeToXml error: %v", err)
 	}
-	want := `<root><m><item>1</item><item>2</item></m></root>`
+	want := `<root xmlns:t="` + markerNamespace + `"><m t:type="array">` +
+		`<item t:type="array"><item>1</item><item>2</item></item></m></root>`
 	if got := normalizeXml(string(out)); got != want {
 		t.Errorf("got:  %s\nwant: %s", got, want)
+	}
+
+	back, err := DecodeXml(out)
+	if err != nil {
+		t.Fatalf("DecodeXml error: %v", err)
+	}
+	m := back.Value.Node
+	if m == nil || m.Value.Type != node.TypeArray || len(m.Value.Array) != 1 {
+		t.Fatalf("m = %+v, want a list of 1", m)
+	}
+	inner := m.Value.Array[0]
+	if inner.Type != node.TypeArray || len(inner.Array) != 2 {
+		t.Errorf("inner list = %+v, want a list of 2", inner)
 	}
 }
 
@@ -978,5 +1017,419 @@ func TestNodeToXml_RootArrayDepthLimit(t *testing.T) {
 	}
 	if _, err := NodeToXml(root); err == nil {
 		t.Error("expected an error past the depth limit")
+	}
+}
+
+// ---- Type markers ----
+
+// TestNodeToXml_MarkersRoundTrip covers the values XML has no shape of its own
+// for. Each one is written with a marker and must come back as what it was.
+func TestNodeToXml_MarkersRoundTrip(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    *node.Value
+		wantXml  string
+		wantType node.ValueType
+	}{
+		{
+			"null",
+			&node.Value{Type: node.TypeNull},
+			`<a t:type="null"/>`,
+			node.TypeNull,
+		},
+		{
+			"empty string",
+			&node.Value{Type: node.TypeString, Worth: ""},
+			`<a t:type="string"/>`,
+			node.TypeString,
+		},
+		{
+			"empty list",
+			&node.Value{Type: node.TypeArray, Array: []*node.Value{}},
+			`<a t:type="array"/>`,
+			node.TypeArray,
+		},
+		{
+			"list holding one value",
+			&node.Value{Type: node.TypeArray, Array: []*node.Value{{Type: node.TypeNumber, Worth: "80"}}},
+			`<a t:type="array"><item>80</item></a>`,
+			node.TypeArray,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := &node.Node{
+				Key: "root",
+				Value: &node.Value{
+					Type: node.TypeObject,
+					Node: &node.Node{Key: "a", Value: tt.value},
+				},
+			}
+			out, err := NodeToXml(n)
+			if err != nil {
+				t.Fatalf("NodeToXml error: %v", err)
+			}
+			want := `<root xmlns:t="` + markerNamespace + `">` + tt.wantXml + `</root>`
+			if got := normalizeXml(string(out)); got != want {
+				t.Errorf("got:  %s\nwant: %s", got, want)
+			}
+
+			back, err := DecodeXml(out)
+			if err != nil {
+				t.Fatalf("DecodeXml error: %v", err)
+			}
+			a := back.Value.Node
+			if a == nil || a.Key != "a" {
+				t.Fatalf("expected an 'a' node, got %v", a)
+			}
+			if a.Value.Type != tt.wantType {
+				t.Errorf("type = %v, want %v", a.Value.Type, tt.wantType)
+			}
+		})
+	}
+}
+
+// TestNodeToXml_NoMarkerWhenNotNeeded is the other half of the contract: a
+// document whose shapes XML can hold on its own is written exactly as it was
+// before markers existed, with no namespace declaration and no extra attribute.
+func TestNodeToXml_NoMarkerWhenNotNeeded(t *testing.T) {
+	documents := []string{
+		`<root><a>1</a><b>2</b></root>`,
+		`<root><i>1</i><i>2</i></root>`,
+		`<root id="1"><x a="2">text</x></root>`,
+		`<root><o/></root>`,
+		`<root><deep><a>1</a><a>2</a><a>3</a></deep></root>`,
+	}
+	for _, in := range documents {
+		t.Run(in, func(t *testing.T) {
+			n, err := DecodeXml([]byte(in))
+			if err != nil {
+				t.Fatalf("DecodeXml error: %v", err)
+			}
+			out, err := NodeToXml(n)
+			if err != nil {
+				t.Fatalf("NodeToXml error: %v", err)
+			}
+			got := normalizeXml(string(out))
+			if strings.Contains(got, markerNamespace) {
+				t.Errorf("a document that needs no marker declared the namespace: %s", got)
+			}
+			if got != in {
+				t.Errorf("got:  %s\nwant: %s", got, in)
+			}
+		})
+	}
+}
+
+// TestNodeToXml_MarkerPrefixAvoidsCollision covers a document that already uses
+// the preferred prefix for a namespace of its own.
+func TestNodeToXml_MarkerPrefixAvoidsCollision(t *testing.T) {
+	n := &node.Node{
+		Key: "root",
+		Value: &node.Value{
+			Type: node.TypeObject,
+			Node: &node.Node{
+				Key:   "@xmlns:t",
+				Value: &node.Value{Type: node.TypeString, Worth: "http://other.com"},
+				Next: &node.Node{
+					Key:   "n",
+					Value: &node.Value{Type: node.TypeNull},
+				},
+			},
+		},
+	}
+	out, err := NodeToXml(n)
+	if err != nil {
+		t.Fatalf("NodeToXml error: %v", err)
+	}
+	got := normalizeXml(string(out))
+	want := `<root xmlns:t="http://other.com" xmlns:t1="` + markerNamespace + `"><n t1:type="null"/></root>`
+	if got != want {
+		t.Errorf("got:  %s\nwant: %s", got, want)
+	}
+
+	back, err := DecodeXml(out)
+	if err != nil {
+		t.Fatalf("DecodeXml error: %v", err)
+	}
+	var decl, nullNode *node.Node
+	for cur := back.Value.Node; cur != nil; cur = cur.Next {
+		switch cur.Key {
+		case "@xmlns:t":
+			decl = cur
+		case "n":
+			nullNode = cur
+		}
+	}
+	if decl == nil || decl.Value.Worth != "http://other.com" {
+		t.Errorf("the document's own namespace declaration was lost: %v", decl)
+	}
+	if nullNode == nil || nullNode.Value.Type != node.TypeNull {
+		t.Errorf("n = %v, want null", nullNode)
+	}
+	// The marker's own declaration must not survive as data.
+	for cur := back.Value.Node; cur != nil; cur = cur.Next {
+		if strings.Contains(cur.Key, "t1") {
+			t.Errorf("the marker namespace leaked into the tree as %q", cur.Key)
+		}
+	}
+}
+
+// TestDecodeXml_ForeignMarkerNamespaceIsData checks that an attribute merely
+// named "type" in somebody else's namespace stays part of the document.
+func TestDecodeXml_ForeignMarkerNamespaceIsData(t *testing.T) {
+	in := `<root xmlns:t="http://other.com"><a t:type="null">1</a></root>`
+	n, err := DecodeXml([]byte(in))
+	if err != nil {
+		t.Fatalf("DecodeXml error: %v", err)
+	}
+
+	// The document's own namespace declaration is stored as an attribute, so
+	// the element is the second child.
+	var a *node.Node
+	for cur := n.Value.Node; cur != nil; cur = cur.Next {
+		if cur.Key == "a" {
+			a = cur
+		}
+	}
+	if a == nil {
+		t.Fatal("expected an 'a' node")
+	}
+	if a.Value.Type == node.TypeNull {
+		t.Fatal("a marker from another namespace was obeyed")
+	}
+
+	var attr *node.Node
+	for cur := a.Value.Node; cur != nil; cur = cur.Next {
+		if cur.Key == "@t:type" {
+			attr = cur
+		}
+	}
+	if attr == nil || attr.Value.Worth != "null" {
+		t.Errorf("the foreign attribute was dropped instead of kept as data: %v", attr)
+	}
+}
+
+// TestDecodeXml_UnknownMarkerIsIgnored keeps a future or malformed marker from
+// turning a document into something else.
+func TestDecodeXml_UnknownMarkerIsIgnored(t *testing.T) {
+	in := `<root xmlns:t="` + markerNamespace + `"><a t:type="something-else">1</a></root>`
+	n, err := DecodeXml([]byte(in))
+	if err != nil {
+		t.Fatalf("DecodeXml error: %v", err)
+	}
+	a := n.Value.Node
+	if a == nil || a.Value.Type != node.TypeNumber || a.Value.Worth != "1" {
+		t.Errorf("a = %+v, want the number 1", a)
+	}
+}
+
+// TestNodeToXml_MarkedListOfObjects covers a one-element list whose value is an
+// object, where the element carries both the marker and its own children.
+func TestNodeToXml_MarkedListOfObjects(t *testing.T) {
+	item := &node.Node{
+		Key: "item0",
+		Value: &node.Value{
+			Type: node.TypeObject,
+			Node: &node.Node{Key: "name", Value: &node.Value{Type: node.TypeString, Worth: "web"}},
+		},
+	}
+	n := &node.Node{
+		Key: "root",
+		Value: &node.Value{
+			Type: node.TypeObject,
+			Node: &node.Node{
+				Key: "containers",
+				Value: &node.Value{
+					Type:  node.TypeArray,
+					Array: []*node.Value{{Type: node.TypeObject, Node: item}},
+				},
+			},
+		},
+	}
+	out, err := NodeToXml(n)
+	if err != nil {
+		t.Fatalf("NodeToXml error: %v", err)
+	}
+	want := `<root xmlns:t="` + markerNamespace + `"><containers t:type="array">` +
+		`<item><name>web</name></item></containers></root>`
+	if got := normalizeXml(string(out)); got != want {
+		t.Errorf("got:  %s\nwant: %s", got, want)
+	}
+
+	back, err := DecodeXml(out)
+	if err != nil {
+		t.Fatalf("DecodeXml error: %v", err)
+	}
+	containers := back.Value.Node
+	if containers == nil || containers.Value.Type != node.TypeArray || len(containers.Value.Array) != 1 {
+		t.Fatalf("containers = %+v, want a list of 1", containers)
+	}
+	object := containers.Value.Array[0]
+	if object.Node == nil || object.Node.Value.Node == nil || object.Node.Value.Node.Key != "name" {
+		t.Errorf("the object inside the list lost its fields: %+v", object)
+	}
+}
+
+// ---- Element names ----
+
+// TestNodeToXml_KeysThatAreNotXmlNames covers keys XML cannot spell. A key like
+// "first name" or "1st" used to be written straight into the tag, producing a
+// document no parser accepts.
+func TestNodeToXml_KeysThatAreNotXmlNames(t *testing.T) {
+	tests := []struct {
+		key      string
+		wantName string
+	}{
+		{"plain", "plain"},
+		{"with.dot", "with.dot"},
+		{"with-dash", "with-dash"},
+		{"_leading", "_leading"},
+		{"şehir", "şehir"},
+		{"日本語", "日本語"},
+		{"first name", "first_x0020_name"},
+		{"1st", "_x0031_st"},
+		{"a/b", "a_x002F_b"},
+		{"a<b", "a_x003C_b"},
+		{"", "_x0000_"},
+		{"_x0020_", "_x005F_x0020_"},
+		{"tel:+90", "tel_x003A__x002B_90"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			n := &node.Node{
+				Key: "root",
+				Value: &node.Value{
+					Type: node.TypeObject,
+					Node: &node.Node{Key: tt.key, Value: &node.Value{Type: node.TypeString, Worth: "v"}},
+				},
+			}
+			out, err := NodeToXml(n)
+			if err != nil {
+				t.Fatalf("NodeToXml error: %v", err)
+			}
+			want := "<root><" + tt.wantName + ">v</" + tt.wantName + "></root>"
+			if got := normalizeXml(string(out)); got != want {
+				t.Errorf("got:  %s\nwant: %s", got, want)
+			}
+			if !IsXml(out) {
+				t.Errorf("produced XML is not valid: %s", out)
+			}
+
+			back, err := DecodeXml(out)
+			if err != nil {
+				t.Fatalf("DecodeXml error: %v", err)
+			}
+			child := back.Value.Node
+			if child == nil || child.Key != tt.key {
+				t.Errorf("key came back as %q, want %q", child.Key, tt.key)
+			}
+		})
+	}
+}
+
+func TestNodeToXml_AttributeNamesAreEscaped(t *testing.T) {
+	n := &node.Node{
+		Key: "root",
+		Value: &node.Value{
+			Type: node.TypeObject,
+			Node: &node.Node{
+				Key:   "@first name",
+				Value: &node.Value{Type: node.TypeString, Worth: "v"},
+			},
+		},
+	}
+	out, err := NodeToXml(n)
+	if err != nil {
+		t.Fatalf("NodeToXml error: %v", err)
+	}
+	if got, want := normalizeXml(string(out)), `<root first_x0020_name="v"/>`; got != want {
+		t.Errorf("got:  %s\nwant: %s", got, want)
+	}
+	if !IsXml(out) {
+		t.Errorf("produced XML is not valid: %s", out)
+	}
+
+	back, err := DecodeXml(out)
+	if err != nil {
+		t.Fatalf("DecodeXml error: %v", err)
+	}
+	if attr := back.Value.Node; attr == nil || attr.Key != "@first name" {
+		t.Errorf("attribute name came back as %v, want @first name", attr)
+	}
+}
+
+// TestNodeToXml_ColonOnlyPrefixesDeclaredNamespaces separates the two things a
+// colon can mean. A declared prefix stays a prefix; a key that merely contains
+// a colon has it escaped, because writing it as a prefix would name a namespace
+// the document never declared.
+func TestNodeToXml_ColonOnlyPrefixesDeclaredNamespaces(t *testing.T) {
+	declared := `<root xmlns:ns="http://e.com"><ns:a>1</ns:a></root>`
+	n, err := DecodeXml([]byte(declared))
+	if err != nil {
+		t.Fatalf("DecodeXml error: %v", err)
+	}
+	out, err := NodeToXml(n)
+	if err != nil {
+		t.Fatalf("NodeToXml error: %v", err)
+	}
+	if got := normalizeXml(string(out)); got != declared {
+		t.Errorf("a declared prefix was not kept\ngot:  %s\nwant: %s", got, declared)
+	}
+
+	undeclared := &node.Node{
+		Key: "root",
+		Value: &node.Value{
+			Type: node.TypeObject,
+			Node: &node.Node{
+				Key:   "ns:a",
+				Value: &node.Value{Type: node.TypeNumber, Worth: "1"},
+			},
+		},
+	}
+	out2, err := NodeToXml(undeclared)
+	if err != nil {
+		t.Fatalf("NodeToXml error: %v", err)
+	}
+	want := `<root><ns_x003A_a>1</ns_x003A_a></root>`
+	if got := normalizeXml(string(out2)); got != want {
+		t.Errorf("an undeclared prefix was written as a prefix\ngot:  %s\nwant: %s", got, want)
+	}
+
+	back, err := DecodeXml(out2)
+	if err != nil {
+		t.Fatalf("DecodeXml error: %v", err)
+	}
+	if child := back.Value.Node; child == nil || child.Key != "ns:a" {
+		t.Errorf("key came back as %v, want ns:a", child)
+	}
+}
+
+func TestEncodeDecodeName(t *testing.T) {
+	roundTrip := []string{
+		"", "a", "_", "a.b", "a-b", "a1", "şehir", "日本語",
+		"first name", "1st", "a/b", "a<b", "a:b", "_x0020_", "  ",
+		"a\tb", "@weird#", "🚀",
+	}
+	for _, name := range roundTrip {
+		t.Run(name, func(t *testing.T) {
+			encoded := encodeName(name)
+			if encoded != "" && !isLegalName(encoded) {
+				t.Errorf("encodeName(%q) = %q, which is not a legal XML name", name, encoded)
+			}
+			if got := decodeName(encoded); got != name {
+				t.Errorf("decodeName(encodeName(%q)) = %q", name, got)
+			}
+		})
+	}
+}
+
+func TestDecodeName_LeavesOrdinaryNamesAlone(t *testing.T) {
+	for _, name := range []string{"a", "apiVersion", "containerPort", "a.b", "a-b", "_x"} {
+		if got := decodeName(name); got != name {
+			t.Errorf("decodeName(%q) = %q, want it unchanged", name, got)
+		}
 	}
 }

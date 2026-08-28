@@ -20,6 +20,25 @@
 //   - Attributes with a namespace prefix are stored as "@prefix:localname"
 //   - Round-trip conversion preserves namespace prefixes and declarations
 //
+// Type markers:
+//
+// A few values JSON and YAML can write have no shape of their own in XML. An
+// empty tag could be a null, an empty string or an empty object, and a single
+// <port> element could be one value or a list holding one. Where the shape
+// would otherwise be lost, the writer marks the element with a "type"
+// attribute in this package's own namespace and the reader reads it back:
+//
+//	<n t:type="null"/>                              null
+//	<s t:type="string"/>                            the empty string
+//	<a t:type="array"/>                             the empty list
+//	<a t:type="array"><item>80</item></a>           a list holding one value
+//	<a t:type="array"><item t:type="array">…</item> a list of lists
+//
+// The marker is written only where it is needed, and the namespace is declared
+// on the root element only when the document uses one. A list of two or more
+// plain values still travels as plain repeated elements, and a document that
+// carries no marker is written exactly as it was before markers existed.
+//
 // XML comments and processing instructions are ignored during decode.
 // Namespace URIs declared in parent elements are available in child elements.
 //
@@ -46,6 +65,26 @@ const maxDepth = 100
 // carries attributes or child elements.
 const textKey = "#text"
 
+// itemKey names the elements of a marked list. Their names carry no meaning:
+// the marker on the parent is what says the children are list values.
+const itemKey = "item"
+
+// markerNamespace identifies this package's type markers. It is a namespace so
+// that a marker can never be mistaken for one of the document's own attributes.
+const markerNamespace = "https://github.com/mstgnz/transformer"
+
+// markerPrefix is the namespace prefix the writer prefers. It gives way to
+// markerPrefix + a number when the document already declares this prefix for
+// something else.
+const markerPrefix = "t"
+
+const (
+	markerAttr   = "type"
+	markerNull   = "null"
+	markerString = "string"
+	markerArray  = "array"
+)
+
 // IsXml checks if the given data is valid XML
 func IsXml(data []byte) bool {
 	return xml.Unmarshal(data, new(any)) == nil
@@ -67,7 +106,8 @@ func ReadXml(filename string) ([]byte, error) {
 //
 // Namespace prefixes are preserved in element and attribute keys.
 // Each element's namespace declarations are stored as attributes on that element.
-// Sibling elements sharing a name are collected into one array node.
+// Sibling elements sharing a name are collected into one array node, and type
+// markers written by NodeToXml are read back into the values they stand for.
 func DecodeXml(data []byte) (*node.Node, error) {
 	decoder := xml.NewDecoder(bytes.NewReader(data))
 	root := &node.Node{
@@ -78,6 +118,10 @@ func DecodeXml(data []byte) (*node.Node, error) {
 	var current *node.Node = root
 	var stack []*node.Node
 	var textContent strings.Builder
+
+	// markers holds the type marker each open element carries, until its end
+	// tag is reached and the marker can be applied.
+	markers := make(map[*node.Node]string)
 
 	// nsStack holds URI→prefix maps per element level.
 	// Each frame contains only the declarations introduced at that level.
@@ -119,9 +163,13 @@ func DecodeXml(data []byte) (*node.Node, error) {
 			textContent.Reset()
 
 			// Collect namespace declarations from this element's attributes
-			// and push a new frame onto the namespace stack.
+			// and push a new frame onto the namespace stack. This package's own
+			// namespace is left out: it describes the encoding, not the data.
 			frame := make(map[string]string)
 			for _, attr := range t.Attr {
+				if attr.Value == markerNamespace {
+					continue
+				}
 				switch {
 				case attr.Name.Space == "xmlns":
 					// xmlns:prefix="uri"
@@ -138,7 +186,7 @@ func DecodeXml(data []byte) (*node.Node, error) {
 			nsStack = append(nsStack, frame)
 
 			// Determine element key, including namespace prefix when present
-			key := t.Name.Local
+			key := decodeName(t.Name.Local)
 			if t.Name.Space != "" {
 				if prefix, ok := resolvePrefix(t.Name.Space); ok && prefix != "" {
 					key = prefix + ":" + t.Name.Local
@@ -150,8 +198,19 @@ func DecodeXml(data []byte) (*node.Node, error) {
 				Value: &node.Value{Type: node.TypeObject},
 			}
 
-			// Attach attributes, translating namespace declarations to @xmlns:* keys
+			// Attach attributes, translating namespace declarations to @xmlns:*
+			// keys. This package's marker and its declaration are consumed
+			// rather than stored: they are not part of the document's data.
+			var marker string
 			for _, attr := range t.Attr {
+				if attr.Name.Space == markerNamespace && attr.Name.Local == markerAttr {
+					marker = attr.Value
+					continue
+				}
+				if attr.Value == markerNamespace {
+					continue
+				}
+
 				var attrKey string
 				switch {
 				case attr.Name.Space == "xmlns":
@@ -169,6 +228,11 @@ func DecodeXml(data []byte) (*node.Node, error) {
 				default:
 					attrKey = "@" + attr.Name.Local
 				}
+				// A namespace declaration is not a data key, so it is left
+				// alone; anything else may carry an escaped name.
+				if !strings.HasPrefix(attrKey, "@xmlns") {
+					attrKey = "@" + decodeName(strings.TrimPrefix(attrKey, "@"))
+				}
 				attrNode := &node.Node{
 					Key:   attrKey,
 					Value: &node.Value{Type: node.TypeString, Worth: attr.Value},
@@ -176,6 +240,9 @@ func DecodeXml(data []byte) (*node.Node, error) {
 				if err := n.AddToEnd(attrNode); err != nil {
 					return nil, err
 				}
+			}
+			if marker != "" {
+				markers[n] = marker
 			}
 
 			// If the top-level element is named "root", promote it to be the
@@ -214,6 +281,13 @@ func DecodeXml(data []byte) (*node.Node, error) {
 			}
 			textContent.Reset()
 
+			if current != nil {
+				if marker, ok := markers[current]; ok {
+					applyMarker(current, marker)
+					delete(markers, current)
+				}
+			}
+
 			if len(stack) > 0 {
 				current = stack[len(stack)-1]
 				stack = stack[:len(stack)-1]
@@ -228,6 +302,48 @@ func DecodeXml(data []byte) (*node.Node, error) {
 
 	groupRepeated(root)
 	return root, nil
+}
+
+// applyMarker turns an element the writer marked back into the value the marker
+// stands for. An unknown marker is ignored, so a document from elsewhere that
+// happens to use this namespace is read as ordinary data.
+func applyMarker(n *node.Node, marker string) {
+	switch marker {
+	case markerNull:
+		n.Value = &node.Value{Type: node.TypeNull}
+	case markerString:
+		if n.Value == nil {
+			n.Value = &node.Value{}
+		}
+		n.Value.Type = node.TypeString
+	case markerArray:
+		n.Value = listFromChildren(n)
+	}
+}
+
+// listFromChildren turns a marked element's children into list values. Their
+// names carry no meaning here; the marker on the parent is what said they are
+// list values rather than named fields.
+func listFromChildren(n *node.Node) *node.Value {
+	list := &node.Value{Type: node.TypeArray, Array: []*node.Value{}}
+	if n.Value == nil {
+		return list
+	}
+
+	// Collect first: turning a child into a list value unlinks it.
+	var children []*node.Node
+	for child := n.Value.Node; child != nil; child = child.Next {
+		if strings.HasPrefix(child.Key, "@") || child.Key == textKey {
+			continue
+		}
+		children = append(children, child)
+	}
+
+	holder := &node.Node{Key: n.Key, Value: list}
+	for _, child := range children {
+		list.Array = append(list.Array, elementValue(holder, child))
+	}
+	return list
 }
 
 // addTextChild hangs an element's text off the element as a "#text" node.
@@ -357,47 +473,225 @@ func elementValue(owner *node.Node, n *node.Node) *node.Value {
 //
 // Namespace prefixes in element keys (e.g. "soap:Envelope") are written as-is.
 // Attributes whose keys start with "@xmlns" are written as namespace declarations.
-// An array node is written as one element per value, named after the node.
+// A list of two or more plain values is written as one element per value; the
+// shapes XML cannot hold on their own carry a type marker instead.
 func NodeToXml(n *node.Node) ([]byte, error) {
 	if n == nil {
 		return nil, fmt.Errorf("node is nil")
 	}
 
-	var buf bytes.Buffer
-	buf.WriteString(xml.Header)
+	w := newXmlWriter(n.Value)
+	rootName := w.qualify(n.Key)
 
-	// XML has no top-level sequence, so a root array is wrapped in the root
-	// element and its values are written as <item> elements.
-	if n.Value != nil && n.Value.Type == node.TypeArray {
-		buf.WriteByte('<')
-		buf.WriteString(n.Key)
-		buf.WriteByte('>')
-		for _, item := range n.Value.Array {
-			if err := writeElement(&buf, "item", unwrapItem(item), 1); err != nil {
+	var attrs, content bytes.Buffer
+	w.writeAttributes(&attrs, n.Value)
+
+	marker := valueMarker(n.Value)
+	if marker == "" && n.Value != nil && n.Value.Type == node.TypeArray {
+		// XML has no top-level sequence, so a root list always needs the marker
+		// even when its values would otherwise travel as repeated elements.
+		marker = markerArray
+	}
+	if marker != "" {
+		w.usedMarker = true
+	}
+
+	selfClose := true
+	switch marker {
+	case markerNull, markerString:
+	case markerArray:
+		if err := w.writeListItems(&content, n.Value, 1); err != nil {
+			return nil, err
+		}
+		selfClose = content.Len() == 0
+	default:
+		if selfClose = isEmptyElement(n.Value); !selfClose {
+			if err := w.writeContent(&content, n.Value, 0); err != nil {
 				return nil, err
 			}
 		}
-		buf.WriteString("</")
-		buf.WriteString(n.Key)
-		buf.WriteByte('>')
-		return buf.Bytes(), nil
 	}
 
-	if err := writeElement(&buf, n.Key, n.Value, 0); err != nil {
-		return nil, err
+	var buf bytes.Buffer
+	buf.WriteString(xml.Header)
+	buf.WriteByte('<')
+	buf.WriteString(rootName)
+	buf.Write(attrs.Bytes())
+	if w.usedMarker {
+		buf.WriteString(` xmlns:`)
+		buf.WriteString(w.prefix)
+		buf.WriteString(`="`)
+		buf.WriteString(markerNamespace)
+		buf.WriteByte('"')
 	}
+	if marker != "" {
+		w.writeMarker(&buf, marker)
+	}
+	if selfClose {
+		buf.WriteString("/>")
+		return buf.Bytes(), nil
+	}
+	buf.WriteByte('>')
+	buf.Write(content.Bytes())
+	buf.WriteString("</")
+	buf.WriteString(rootName)
+	buf.WriteByte('>')
 	return buf.Bytes(), nil
 }
 
+// xmlWriter carries the state the element writers share: which prefix the type
+// markers use, and whether any of them was needed, which is what decides
+// whether the root declares the namespace at all.
+type xmlWriter struct {
+	prefix     string
+	usedMarker bool
+
+	// declared holds the namespace prefixes in scope. A key like
+	// "soap:Envelope" is written as a prefixed name only when its prefix is
+	// one of them; "tel:+90" is a key that merely contains a colon, and
+	// writing it as a prefix would produce a document no namespace-aware
+	// parser accepts.
+	declared map[string]bool
+}
+
+// newXmlWriter starts a writer with the prefixes XML defines on its own, plus
+// the one this package uses for type markers.
+func newXmlWriter(root *node.Value) *xmlWriter {
+	w := &xmlWriter{
+		prefix:   markerPrefixFor(root),
+		declared: map[string]bool{"xml": true, "xmlns": true},
+	}
+	w.declared[w.prefix] = true
+	w.declare(root)
+	return w
+}
+
+// declare adds the prefixes a value's own xmlns attributes introduce, and
+// returns them so the caller can take them back out of scope afterwards.
+func (w *xmlWriter) declare(v *node.Value) []string {
+	if v == nil {
+		return nil
+	}
+	var added []string
+	for current := v.Node; current != nil; current = current.Next {
+		if !strings.HasPrefix(current.Key, "@xmlns:") {
+			continue
+		}
+		prefix := strings.TrimPrefix(current.Key, "@xmlns:")
+		if w.declared[prefix] {
+			continue
+		}
+		w.declared[prefix] = true
+		added = append(added, prefix)
+	}
+	return added
+}
+
+func (w *xmlWriter) undeclare(prefixes []string) {
+	for _, prefix := range prefixes {
+		delete(w.declared, prefix)
+	}
+}
+
+// qualify turns a node key into a legal XML name, keeping a namespace prefix
+// as a prefix when the document declares it and escaping the colon when it
+// does not.
+func (w *xmlWriter) qualify(key string) string {
+	if i := strings.Index(key, ":"); i > 0 && w.declared[key[:i]] {
+		return key[:i] + ":" + encodeName(key[i+1:])
+	}
+	return encodeName(key)
+}
+
+// markerPrefixFor picks a marker prefix the document does not already use for
+// something of its own.
+func markerPrefixFor(v *node.Value) string {
+	declared := make(map[string]bool)
+	if v != nil {
+		for current := v.Node; current != nil; current = current.Next {
+			if strings.HasPrefix(current.Key, "@xmlns:") {
+				declared[strings.TrimPrefix(current.Key, "@xmlns:")] = true
+			}
+		}
+	}
+	if !declared[markerPrefix] {
+		return markerPrefix
+	}
+	for i := 1; ; i++ {
+		candidate := fmt.Sprintf("%s%d", markerPrefix, i)
+		if !declared[candidate] {
+			return candidate
+		}
+	}
+}
+
+// valueMarker returns the marker a value needs to survive XML, or the empty
+// string when the element's own shape already says what it is.
+func valueMarker(v *node.Value) string {
+	if v == nil {
+		return ""
+	}
+	switch v.Type {
+	case node.TypeNull:
+		return markerNull
+	case node.TypeString:
+		if v.Worth == "" && !hasContentChildren(v) {
+			return markerString
+		}
+	case node.TypeArray:
+		return markerArray
+	}
+	return ""
+}
+
+// listNeedsMarker reports whether a list has to be written as a marked element
+// rather than as repeated elements. Two or more plain values are their own
+// evidence; anything else is ambiguous once written.
+func listNeedsMarker(v *node.Value) bool {
+	if len(v.Array) < 2 {
+		return true
+	}
+	for _, item := range v.Array {
+		if inner := unwrapItem(item); inner != nil && inner.Type == node.TypeArray {
+			return true
+		}
+	}
+	return false
+}
+
+func (w *xmlWriter) writeMarker(buf *bytes.Buffer, marker string) {
+	buf.WriteByte(' ')
+	buf.WriteString(w.prefix)
+	buf.WriteByte(':')
+	buf.WriteString(markerAttr)
+	buf.WriteString(`="`)
+	buf.WriteString(marker)
+	buf.WriteByte('"')
+}
+
 // writeElement writes one <key>...</key> element holding v.
-func writeElement(buf *bytes.Buffer, key string, v *node.Value, depth int) error {
+func (w *xmlWriter) writeElement(buf *bytes.Buffer, key string, v *node.Value, depth int) error {
 	if depth > maxDepth {
 		return fmt.Errorf("max nesting depth %d exceeded", maxDepth)
 	}
 
+	marker := valueMarker(v)
+	if marker != "" {
+		w.usedMarker = true
+	}
+
+	// The element's own declarations come into scope first: an element may
+	// use a prefix it declares on itself.
+	added := w.declare(v)
+	defer w.undeclare(added)
+	name := w.qualify(key)
+
 	buf.WriteByte('<')
-	buf.WriteString(key)
-	writeAttributes(buf, v)
+	buf.WriteString(name)
+	w.writeAttributes(buf, v)
+	if marker != "" {
+		w.writeMarker(buf, marker)
+	}
 
 	if isEmptyElement(v) {
 		buf.WriteString("/>")
@@ -405,17 +699,17 @@ func writeElement(buf *bytes.Buffer, key string, v *node.Value, depth int) error
 	}
 
 	buf.WriteByte('>')
-	if err := writeContent(buf, v, depth); err != nil {
+	if err := w.writeContent(buf, v, depth); err != nil {
 		return err
 	}
 	buf.WriteString("</")
-	buf.WriteString(key)
+	buf.WriteString(name)
 	buf.WriteByte('>')
 	return nil
 }
 
 // writeAttributes writes the "@"-prefixed children of v as XML attributes.
-func writeAttributes(buf *bytes.Buffer, v *node.Value) {
+func (w *xmlWriter) writeAttributes(buf *bytes.Buffer, v *node.Value) {
 	if v == nil {
 		return
 	}
@@ -424,7 +718,7 @@ func writeAttributes(buf *bytes.Buffer, v *node.Value) {
 			continue
 		}
 		buf.WriteByte(' ')
-		buf.WriteString(strings.TrimPrefix(current.Key, "@"))
+		buf.WriteString(w.qualify(strings.TrimPrefix(current.Key, "@")))
 		buf.WriteString(`="`)
 		if current.Value != nil {
 			buf.WriteString(escapeXml(current.Value.Worth))
@@ -434,37 +728,42 @@ func writeAttributes(buf *bytes.Buffer, v *node.Value) {
 }
 
 // writeContent writes everything between an element's tags.
-func writeContent(buf *bytes.Buffer, v *node.Value, depth int) error {
+func (w *xmlWriter) writeContent(buf *bytes.Buffer, v *node.Value, depth int) error {
 	if v == nil {
 		return nil
 	}
 
 	switch v.Type {
 	case node.TypeArray:
-		// Only a nested list reaches here; the outer list was already split
-		// into one element per value by writeChild.
-		for _, item := range v.Array {
-			if err := writeElement(buf, "item", unwrapItem(item), depth+1); err != nil {
-				return err
-			}
-		}
-		return nil
+		return w.writeListItems(buf, v, depth+1)
 
 	case node.TypeString, node.TypeNumber, node.TypeBoolean:
 		buf.WriteString(escapeXml(v.Worth))
-		return writeChildren(buf, v, depth)
+		return w.writeChildren(buf, v, depth)
 
 	case node.TypeObject:
 		buf.WriteString(escapeXml(v.Worth))
-		return writeChildren(buf, v, depth)
+		return w.writeChildren(buf, v, depth)
 	}
 
 	return nil
 }
 
+// writeListItems writes the values of a marked list as <item> elements. Their
+// names carry no meaning; the marker on the parent is what says they are list
+// values rather than named fields.
+func (w *xmlWriter) writeListItems(buf *bytes.Buffer, v *node.Value, depth int) error {
+	for _, item := range v.Array {
+		if err := w.writeElement(buf, itemKey, unwrapItem(item), depth); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // writeChildren writes an element's child nodes, skipping attributes and
 // turning the "#text" node back into text.
-func writeChildren(buf *bytes.Buffer, v *node.Value, depth int) error {
+func (w *xmlWriter) writeChildren(buf *bytes.Buffer, v *node.Value, depth int) error {
 	for current := v.Node; current != nil; current = current.Next {
 		if strings.HasPrefix(current.Key, "@") {
 			continue
@@ -473,7 +772,7 @@ func writeChildren(buf *bytes.Buffer, v *node.Value, depth int) error {
 			writeText(buf, current.Value)
 			continue
 		}
-		if err := writeChild(buf, current, depth+1); err != nil {
+		if err := w.writeChild(buf, current, depth+1); err != nil {
 			return err
 		}
 	}
@@ -497,23 +796,19 @@ func writeText(buf *bytes.Buffer, v *node.Value) {
 	buf.WriteString(escapeXml(v.Worth))
 }
 
-// writeChild writes one child node. A list is written as one element per value,
-// each named after the node, which is how the document held it before decoding.
-func writeChild(buf *bytes.Buffer, n *node.Node, depth int) error {
-	if n.Value != nil && n.Value.Type == node.TypeArray {
-		if len(n.Value.Array) == 0 {
-			// An empty list has no values to write. The tag is kept so the key
-			// does not disappear from the document altogether.
-			return writeElement(buf, n.Key, nil, depth)
-		}
+// writeChild writes one child node. A list of two or more plain values is
+// written as one element per value, which is how the document held it before
+// decoding; anything else carries a marker so its shape survives.
+func (w *xmlWriter) writeChild(buf *bytes.Buffer, n *node.Node, depth int) error {
+	if n.Value != nil && n.Value.Type == node.TypeArray && !listNeedsMarker(n.Value) {
 		for _, item := range n.Value.Array {
-			if err := writeElement(buf, n.Key, unwrapItem(item), depth); err != nil {
+			if err := w.writeElement(buf, n.Key, unwrapItem(item), depth); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
-	return writeElement(buf, n.Key, n.Value, depth)
+	return w.writeElement(buf, n.Key, n.Value, depth)
 }
 
 // unwrapItem returns the value an array element holds. Object elements carry a
@@ -569,4 +864,138 @@ func escapeXml(s string) string {
 	s = strings.ReplaceAll(s, "\"", "&quot;")
 	s = strings.ReplaceAll(s, "'", "&apos;")
 	return s
+}
+
+// XML names are not free text: an element cannot be called "first name" or
+// "1st", so a JSON key that is not a legal name would produce a document no
+// parser accepts. Such a name is escaped on the way out and read back on the
+// way in, the way XmlConvert.EncodeName has long done it, so the key survives
+// and the document stays valid.
+//
+// A name that is already legal is written untouched, which is nearly all of
+// them.
+
+// emptyNameEscape stands for the empty key. No character escapes to it, since
+// a NUL cannot appear in XML text at all.
+const emptyNameEscape = "_x0000_"
+
+// encodeName returns a legal XML name for a node key.
+func encodeName(name string) string {
+	if name == "" {
+		return emptyNameEscape
+	}
+	if isLegalName(name) && !strings.Contains(name, "_x") {
+		return name
+	}
+
+	var b strings.Builder
+	for i, r := range name {
+		switch {
+		case r == '_' && looksEscaped(name[i:]):
+			// Escape the underscore so the sequence cannot be read back as an
+			// escape that was never written as one.
+			b.WriteString("_x005F_")
+		case i == 0 && isNameStart(r), i > 0 && isNameChar(r):
+			b.WriteRune(r)
+		default:
+			fmt.Fprintf(&b, "_x%04X_", r)
+		}
+	}
+	return b.String()
+}
+
+// decodeName reverses encodeName.
+func decodeName(name string) string {
+	if name == emptyNameEscape {
+		return ""
+	}
+	if !strings.Contains(name, "_x") {
+		return name
+	}
+
+	var b strings.Builder
+	for i := 0; i < len(name); {
+		if name[i] == '_' && looksEscaped(name[i:]) {
+			var r rune
+			if _, err := fmt.Sscanf(name[i+2:i+6], "%04X", &r); err == nil {
+				b.WriteRune(r)
+				i += 7
+				continue
+			}
+		}
+		b.WriteByte(name[i])
+		i++
+	}
+	return b.String()
+}
+
+// looksEscaped reports whether s opens with an _xHHHH_ escape.
+func looksEscaped(s string) bool {
+	if len(s) < 7 || s[0] != '_' || s[1] != 'x' || s[6] != '_' {
+		return false
+	}
+	for i := 2; i < 6; i++ {
+		c := s[i]
+		if (c < '0' || c > '9') && (c < 'A' || c > 'F') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+// isLegalName reports whether a name can be written as an XML name as it is.
+func isLegalName(name string) bool {
+	for i, r := range name {
+		if i == 0 {
+			if !isNameStart(r) {
+				return false
+			}
+			continue
+		}
+		if !isNameChar(r) {
+			return false
+		}
+	}
+	return name != ""
+}
+
+// isNameStart follows the NameStartChar production of XML 1.0, minus ':'.
+// A colon is not an ordinary name character here: it separates a namespace
+// prefix from the local name, and qualify decides which of the two a given
+// key holds.
+func isNameStart(r rune) bool {
+	switch {
+	case r == '_':
+		return true
+	case r >= 'A' && r <= 'Z', r >= 'a' && r <= 'z':
+		return true
+	case r >= 0xC0 && r <= 0xD6, r >= 0xD8 && r <= 0xF6, r >= 0xF8 && r <= 0x2FF:
+		return true
+	case r >= 0x370 && r <= 0x37D, r >= 0x37F && r <= 0x1FFF:
+		return true
+	case r >= 0x200C && r <= 0x200D, r >= 0x2070 && r <= 0x218F:
+		return true
+	case r >= 0x2C00 && r <= 0x2FEF, r >= 0x3001 && r <= 0xD7FF:
+		return true
+	case r >= 0xF900 && r <= 0xFDCF, r >= 0xFDF0 && r <= 0xFFFD:
+		return true
+	case r >= 0x10000 && r <= 0xEFFFF:
+		return true
+	}
+	return false
+}
+
+// isNameChar follows the NameChar production of XML 1.0.
+func isNameChar(r rune) bool {
+	switch {
+	case isNameStart(r):
+		return true
+	case r == '-' || r == '.' || r == 0xB7:
+		return true
+	case r >= '0' && r <= '9':
+		return true
+	case r >= 0x300 && r <= 0x36F, r >= 0x203F && r <= 0x2040:
+		return true
+	}
+	return false
 }

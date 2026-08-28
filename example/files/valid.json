@@ -1,100 +1,171 @@
 {
-  "web-app": {
-    "servlet": [
+  "meta": {
+    "id": 9007199254740993,
+    "version": "2.1.0",
+    "generated": "2026-08-29T09:15:00Z",
+    "name": "catalog",
+    "tags": ["alpha", "beta", "gamma"],
+    "weights": [1, 2.5, -3, 1e3, 0.0001],
+    "flags": [true, false, true],
+    "mixed": [1, "two", true, null, {"kind": "object"}, [1, 2]],
+    "single": [42],
+    "singleObject": [{"only": "one"}],
+    "empty": {
+      "object": {},
+      "array": [],
+      "text": "",
+      "nothing": null
+    },
+    "unicode": {
+      "tr": "İstanbul çğıöşü",
+      "jp": "日本語のテキスト",
+      "emoji": "🚀 ✅ ☕"
+    },
+    "awkward keys": {
+      "first name": "John",
+      "1st": "place",
+      "a/b": "slash",
+      "config:key": "colon that is not a namespace"
+    }
+  },
+  "matrix": [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+  "cube": [[[1, 2], [3, 4]], [[5, 6], [7, 8]]],
+  "ragged": [[1], [], [2, 3], [[4]]],
+  "stringsOnly": ["one", "two", "three", "four"],
+  "numbersOnly": [10, 20, 30, 40, 50],
+  "deep": [
+    [
       {
-        "servlet-name": "cofaxCDS",
-        "servlet-class": "org.cofax.cds.CDSServlet",
-        "init-param": {
-          "configGlossary:installationAt": "Philadelphia, PA",
-          "configGlossary:adminEmail": "ksm@pobox.com",
-          "configGlossary:poweredBy": "Cofax",
-          "configGlossary:poweredByIcon": "/images/cofax.gif",
-          "configGlossary:staticPath": "/content/static",
-          "templateProcessorClass": "org.cofax.WysiwygTemplate",
-          "templateLoaderClass": "org.cofax.FilesTemplateLoader",
-          "templatePath": "templates",
-          "templateOverridePath": "",
-          "defaultListTemplate": "listTemplate.htm",
-          "defaultFileTemplate": "articleTemplate.htm",
-          "useJSP": false,
-          "jspListTemplate": "listTemplate.jsp",
-          "jspFileTemplate": "articleTemplate.jsp",
-          "cachePackageTagsTrack": 200,
-          "cachePackageTagsStore": 200,
-          "cachePackageTagsRefresh": 60,
-          "cacheTemplatesTrack": 100,
-          "cacheTemplatesStore": 50,
-          "cacheTemplatesRefresh": 15,
-          "cachePagesTrack": 200,
-          "cachePagesStore": 100,
-          "cachePagesRefresh": 10,
-          "cachePagesDirtyRead": 10,
-          "searchEngineListTemplate": "forSearchEnginesList.htm",
-          "searchEngineFileTemplate": "forSearchEngines.htm",
-          "searchEngineRobotsDb": "WEB-INF/robots.db",
-          "useDataStore": true,
-          "dataStoreClass": "org.cofax.SqlDataStore",
-          "redirectionClass": "org.cofax.SqlRedirection",
-          "dataStoreName": "cofax",
-          "dataStoreDriver": "com.microsoft.jdbc.sqlserver.SQLServerDriver",
-          "dataStoreUrl": "jdbc:microsoft:sqlserver://LOCALHOST:1433;DatabaseName=goon",
-          "dataStoreUser": "sa",
-          "dataStorePassword": "dataStoreTestQuery",
-          "dataStoreTestQuery": "SET NOCOUNT ON;select test='test';",
-          "dataStoreLogFile": "/usr/local/tomcat/logs/datastore.log",
-          "dataStoreInitConns": 10,
-          "dataStoreMaxConns": 100,
-          "dataStoreConnUsageLimit": 100,
-          "dataStoreLogLevel": "debug",
-          "maxUrlLength": 500
+        "level": 3,
+        "name": "array-in-array-object",
+        "items": [
+          {
+            "level": 5,
+            "name": "object-in-array",
+            "entries": [
+              {
+                "level": 7,
+                "name": "array-in-object",
+                "detail": {
+                  "level": 8,
+                  "name": "deepest",
+                  "path": "deep[0][0].items[0].entries[0].detail"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  ],
+  "groups": [
+    {
+      "name": "primary",
+      "active": true,
+      "quota": {"cpu": "2000m", "memory": "4Gi", "limits": [1, 2]},
+      "members": [
+        {
+          "name": "alice",
+          "roles": ["admin", "developer"],
+          "scores": [95, 87, 78],
+          "profile": {
+            "name": "Alice Doe",
+            "contact": {
+              "email": "alice@example.com",
+              "phones": ["+90 555 000 0001", "+1 555 000 0002"],
+              "address": {
+                "name": "home",
+                "city": "İstanbul",
+                "lines": ["Line one", "Line two"],
+                "geo": [41.0082, 28.9784]
+              }
+            },
+            "history": [
+              {
+                "year": 2024,
+                "projects": [
+                  {
+                    "name": "atlas",
+                    "stack": ["go", "postgres", "redis"],
+                    "milestones": [
+                      {"quarter": 1, "done": true, "notes": []},
+                      {"quarter": 2, "done": false, "notes": ["slipped", "rescoped"]}
+                    ]
+                  },
+                  {
+                    "name": "beacon",
+                    "stack": ["typescript"],
+                    "milestones": [
+                      {"quarter": 3, "done": true, "notes": null}
+                    ]
+                  }
+                ]
+              },
+              {
+                "year": 2025,
+                "projects": [
+                  {
+                    "name": "cinder",
+                    "stack": ["rust", "wasm"],
+                    "milestones": [
+                      {"quarter": 1, "done": false, "notes": ["blocked"]}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "bob",
+          "roles": ["developer"],
+          "scores": [72],
+          "profile": {
+            "name": "Bob Roe",
+            "contact": {
+              "email": "bob@example.com",
+              "phones": [],
+              "address": {
+                "name": "office",
+                "city": "Ankara",
+                "lines": ["Single line"],
+                "geo": [39.9334, 32.8597]
+              }
+            },
+            "history": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "secondary",
+      "active": false,
+      "quota": {"cpu": "500m", "memory": "1Gi", "limits": []},
+      "members": []
+    }
+  ],
+  "registry": {
+    "servers": [
+      {
+        "name": "db-1",
+        "ports": [5432],
+        "replicas": {
+          "name": "db-1-replicas",
+          "nodes": [
+            {"name": "db-1-a", "healthy": true, "load": [0.1, 0.4]},
+            {"name": "db-1-b", "healthy": false, "load": [0.9]}
+          ]
         }
       },
       {
-        "servlet-name": "cofaxEmail",
-        "servlet-class": "org.cofax.cds.EmailServlet",
-        "init-param": {
-          "mailHost": "mail1",
-          "mailHostOverride": "mail2"
-        }
-      },
-      {
-        "servlet-name": "cofaxAdmin",
-        "servlet-class": "org.cofax.cds.AdminServlet"
-      },
-      {
-        "servlet-name": "fileServlet",
-        "servlet-class": "org.cofax.cds.FileServlet"
-      },
-      {
-        "servlet-name": "cofaxTools",
-        "servlet-class": "org.cofax.cms.CofaxToolsServlet",
-        "init-param": {
-          "templatePath": "toolstemplates/",
-          "log": 1,
-          "logLocation": "/usr/local/tomcat/logs/CofaxTools.log",
-          "logMaxSize": "",
-          "dataLog": 1,
-          "dataLogLocation": "/usr/local/tomcat/logs/dataLog.log",
-          "dataLogMaxSize": "",
-          "removePageCache": "/content/admin/remove?cache=pages&id=",
-          "removeTemplateCache": "/content/admin/remove?cache=templates&id=",
-          "fileTransferFolder": "/usr/local/tomcat/webapps/content/fileTransferFolder",
-          "lookInContext": 1,
-          "adminGroupID": 4,
-          "betaServer": true
+        "name": "cache-1",
+        "ports": [6379, 6380],
+        "replicas": {
+          "name": "cache-1-replicas",
+          "nodes": []
         }
       }
-    ],
-    "servlet-mapping": {
-      "cofaxCDS": "/",
-      "cofaxEmail": "/cofaxutil/aemail/*",
-      "cofaxAdmin": "/admin/*",
-      "fileServlet": "/static/*",
-      "cofaxTools": "/tools/*"
-    },
-    "taglib": {
-      "taglib-uri": "cofax.tld",
-      "taglib-location": "/WEB-INF/tlds/cofax.tld"
-    }
-  }
+    ]
+  },
+  "name": "root level name"
 }

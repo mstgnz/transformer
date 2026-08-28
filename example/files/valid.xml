@@ -1,14 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<root attr="root">
+<root attr="root" version="2.1.0" xmlns:cfg="http://example.com/config" xmlns:ns="http://example.com/ns">
 	<apiVersion>v1</apiVersion>
 	<kind>Pod</kind>
+	<name>catalog</name>
 	<thing prop="2" version="4.5">4.56</thing>
+	<flags>
+		<enabled>true</enabled>
+		<disabled>false</disabled>
+		<count>0</count>
+		<ratio>-0.25</ratio>
+		<big>9007199254740993</big>
+		<label>İstanbul çğıöşü</label>
+		<jp>日本語のテキスト</jp>
+	</flags>
+	<blank/>
+	<onlyAttributes id="7" kind="marker"/>
+	<cfg:settings cfg:scope="global">
+		<cfg:entry key="timeout">30</cfg:entry>
+		<cfg:entry key="retries">3</cfg:entry>
+		<ns:note lang="en">namespaced sibling</ns:note>
+	</cfg:settings>
 	<metadata>
 		<name>rss-site</name>
 		<labels>
 			<app>web</app>
+			<tier>frontend</tier>
 		</labels>
+		<annotations>
+			<annotation key="owner">platform</annotation>
+			<annotation key="revision">17</annotation>
+			<annotation key="notes"/>
+		</annotations>
 	</metadata>
+	<matrix>
+		<row index="0">
+			<cell>1</cell>
+			<cell>2</cell>
+			<cell>3</cell>
+		</row>
+		<row index="1">
+			<cell>4</cell>
+			<cell>5</cell>
+			<cell>6</cell>
+		</row>
+	</matrix>
 	<spec>
 		<containers>
 			<name>front-end</name>
@@ -20,6 +55,14 @@
 				<status status="on">on</status>
 				<status>off</status>
 			</ports>
+			<env>
+				<var name="BROKER_URL">https://broker-service.info</var>
+				<var name="RETRIES">5</var>
+			</env>
+			<volumeMounts>
+				<mount name="config" path="/etc/app"/>
+				<mount name="cache" path="/var/cache"/>
+			</volumeMounts>
 		</containers>
 		<containers>
 			<name>rss-reader</name>
@@ -31,6 +74,115 @@
 				<test type="old">old</test>
 				<test>new</test>
 			</ports>
+			<env/>
 		</containers>
 	</spec>
+	<groups>
+		<group>
+			<name>primary</name>
+			<members>
+				<member>
+					<name>alice</name>
+					<roles>
+						<role>admin</role>
+						<role>developer</role>
+					</roles>
+					<profile>
+						<name>Alice Doe</name>
+						<contact>
+							<email>alice@example.com</email>
+							<phones>
+								<phone kind="mobile">+90 555 000 0001</phone>
+								<phone kind="work">+1 555 000 0002</phone>
+							</phones>
+							<address>
+								<name>home</name>
+								<city>İstanbul</city>
+								<geo>
+									<lat>41.0082</lat>
+									<lon>28.9784</lon>
+								</geo>
+							</address>
+						</contact>
+						<history>
+							<year value="2024">
+								<projects>
+									<project>
+										<name>atlas</name>
+										<stack>
+											<item>go</item>
+											<item>postgres</item>
+										</stack>
+										<milestones>
+											<milestone quarter="1" done="true"/>
+											<milestone quarter="2" done="false"/>
+										</milestones>
+									</project>
+									<project>
+										<name>beacon</name>
+										<stack>
+											<item>typescript</item>
+											<item>node</item>
+										</stack>
+										<milestones>
+											<milestone quarter="3" done="true"/>
+											<milestone quarter="4" done="false"/>
+										</milestones>
+									</project>
+								</projects>
+							</year>
+							<year value="2025">
+								<projects>
+									<project>
+										<name>cinder</name>
+										<stack>
+											<item>rust</item>
+											<item>wasm</item>
+										</stack>
+										<milestones>
+											<milestone quarter="1" done="false"/>
+											<milestone quarter="2" done="true"/>
+										</milestones>
+									</project>
+								</projects>
+							</year>
+						</history>
+					</profile>
+				</member>
+				<member>
+					<name>bob</name>
+					<roles>
+						<role>developer</role>
+						<role>reviewer</role>
+					</roles>
+					<profile>
+						<name>Bob Roe</name>
+						<contact>
+							<email>bob@example.com</email>
+							<phones>
+								<phone kind="mobile">+90 555 000 0003</phone>
+								<phone kind="home">+90 555 000 0004</phone>
+							</phones>
+							<address>
+								<name>office</name>
+								<city>Ankara</city>
+								<geo>
+									<lat>39.9334</lat>
+									<lon>32.8597</lon>
+								</geo>
+							</address>
+						</contact>
+					</profile>
+				</member>
+			</members>
+		</group>
+		<group>
+			<name>secondary</name>
+			<members/>
+		</group>
+	</groups>
+	<escapes>
+		<text>a &amp; b &lt; c &gt; d &quot; e &apos; f</text>
+		<url>https://example.com/?a=1&amp;b=2</url>
+	</escapes>
 </root>

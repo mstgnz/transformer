@@ -7,13 +7,13 @@ Transformer is a Go library that enables conversion between different data forma
 ## Features
 
 - Convert between JSON, XML, and YAML formats
-- Consistent conversion with common data structure
-- Easy to use
-- Type safety
-- Customizable conversion rules
+- Key order, value types and repeated elements survive every conversion
+- Search a document for a key and get back where each hit sits, with its path and depth
+- Find and replace: change every match at once, or exactly the one a path names
+- Address any node or value by path, array indices included
+- Numbers are never routed through float64, so long identifiers keep every digit
 - High test coverage
-- Thread-safe operations
-- Minimal dependencies
+- One dependency: `gopkg.in/yaml.v3`
 
 ## Requirements
 
@@ -165,6 +165,107 @@ node, _ := tyaml.DecodeYaml(yamlData)
 jsonData, _ := tjson.NodeToJson(node)
 ```
 
+## Searching a Document
+
+Conversion is one half of what the Node model is for. The other is looking things up: a key can appear in twenty places in a large document, and which one is meant is a question the route answers.
+
+```go
+matches, _ := transformer.SearchJson(data, "name")
+for _, m := range matches {
+    fmt.Println(m)
+}
+// root.meta.name (depth 2) = catalog
+// root.groups[0].members[0].name (depth 5) = alice
+// root.groups[0].members[0].profile.name (depth 6) = Alice Doe
+// root.deep[0][0].items[0].entries[0].detail.name (depth 9) = deepest
+```
+
+`SearchJson`, `SearchXml` and `SearchYaml` decode and search in one call. On a tree you already hold, the same is `n.Search(key)`.
+
+Each `Match` carries three things:
+
+- `Node` — the node that matched
+- `Path` — how to address it, opening with the searched node's own key: `root.groups[0].members[1].profile.name`
+- `Depth` — how many steps that route takes. A direct child is at depth 1, and an array index is a step of its own.
+
+### Which levels does a key sit on
+
+```go
+root.Depths("name")   // [1 2 3 4 5 6 7 8 9 10]
+```
+
+`Depths` reports the levels a key appears on, in ascending order and without repeats, so a key that shows up at one level can be told from one that runs through the whole document.
+
+### Reading a value back
+
+A path from a match reads back with `GetNodeByPath`, and `GetValueByPath` also reaches plain values inside a list, which have no node of their own:
+
+```go
+root.GetNodeByPath("root.groups[0].members[1].profile.name")   // *Node
+root.GetValueByPath("root.matrix[1][2]")                       // *Value, true
+root.GetValueByPath("root.cube[1][0][1]")                      // *Value, true
+```
+
+A key that itself contains a dot or a bracket cannot be addressed this way; use the `Node` the match carries.
+
+### Searching by anything else
+
+```go
+// every list in the document
+lists := root.SearchFunc(func(n *node.Node) bool { return n.Type() == node.TypeArray })
+
+// does this key exist anywhere, including inside lists
+root.Exists("milestones")   // true
+```
+
+Keys inside arrays, and inside arrays of arrays, are reached like any other. A plain value inside a list has no node of its own, so it cannot be a search result; search its list and read the values from it.
+
+
+## Changing a Document
+
+Finding something is usually the first half of a job. `EditJson`, `EditXml` and `EditYaml` decode, hand you the tree, and write the result back in the same format:
+
+```go
+out, _ := transformer.EditJson(data, func(n *node.Node) {
+    n.ReplaceText("staging.example.com", "example.com")
+    n.Rename("labels", "tags")
+    n.Remove("debug")
+})
+```
+
+### Changing everything that matches
+
+| | |
+| --- | --- |
+| `Replace(key, value)` | give every node with that key a copy of the value |
+| `ReplaceFunc(predicate, replace)` | hand every node the predicate accepts to `replace` |
+| `Rename(oldKey, newKey)` | rename every key that reads `oldKey` |
+| `Remove(key)` | delete every object member with that key |
+| `ReplaceText(old, new)` | rewrite text inside every string value, lists included |
+
+Each returns how many nodes it changed, so a replacement that matched nothing is not silent.
+
+Every target gets its own copy of the value, so changing one result afterwards does not change the rest. `ReplaceText` keeps to text: a key, a number or a boolean that happens to contain the same characters is left alone, and `Rename` is what changes keys.
+
+### Changing exactly one
+
+A path from a search addresses a single node, which is how you change the one occurrence you meant rather than all of them:
+
+```go
+matches := root.Search("name")
+root.SetByPath(matches[3].Path, &node.Value{Type: node.TypeString, Worth: "renamed"})
+```
+
+| | |
+| --- | --- |
+| `SetByPath(path, value)` | replace the value a path addresses, or add the member when the last segment names one that is not there |
+| `RemoveByPath(path)` | remove an object member, or an element from a list |
+
+Both report whether the path led anywhere. `SetByPath` also reaches list elements, including inside lists of lists (`root.matrix[1][2]`), and wraps an object handed to a list element the way the decoders wrap one.
+
+A tree stays sound through all of this: `Validate` still passes after any of them, and the document can be written back in any of the three formats.
+
+
 ## Format-Specific Behavior
 
 ### Key Order
@@ -195,6 +296,38 @@ out, _ := transformer.XmlToJson([]byte(`<root id="5"><name lang="en">John</name>
 ```
 
 The same shape converts back to the original XML.
+
+### XML Type Markers
+
+A few values JSON and YAML can write have no shape of their own in XML. An empty tag could be a null, an empty string or an empty object, and a single `<port>` element could be one value or a list holding one. Where the shape would otherwise be lost, the writer marks the element in this library's own namespace and the reader reads it back:
+
+```xml
+<n t:type="null"/>                          <!-- null -->
+<s t:type="string"/>                        <!-- the empty string -->
+<a t:type="array"/>                         <!-- the empty list -->
+<a t:type="array"><item>80</item></a>       <!-- a list holding one value -->
+```
+
+The marker is written only where it is needed, and the namespace is declared on the root element only when the document uses one. A list of two or more plain values still travels as plain repeated elements, so ordinary documents come out exactly as they did before markers existed.
+
+```go
+out, _ := transformer.JsonToXml([]byte(`{"ports":[80,443]}`))
+// <root><ports>80</ports><ports>443</ports></root>   no marker needed
+
+out, _ = transformer.JsonToXml([]byte(`{"ports":[80]}`))
+// <root xmlns:t="..."><ports t:type="array"><item>80</item></ports></root>
+```
+
+### XML Element Names
+
+XML names are not free text: an element cannot be called `first name` or `1st`. A key that is not a legal name is escaped on the way out and read back on the way in, so the key survives and the document stays valid. Names that are already legal, including non-ASCII ones, are written untouched.
+
+```go
+out, _ := transformer.JsonToXml([]byte(`{"first name":"John","şehir":"İstanbul"}`))
+// <root><first_x0020_name>John</first_x0020_name><şehir>İstanbul</şehir></root>
+```
+
+A colon is treated as a namespace prefix only when the document declares that prefix. `soap:Envelope` beside an `xmlns:soap` declaration stays a prefixed name; a key that merely contains a colon has it escaped, because writing it as a prefix would name a namespace that was never declared.
 
 ### XML Namespaces
 
@@ -228,7 +361,7 @@ defaults: &defaults
   timeout: 30
 
 production:
-  <<: *defaults   # merged: production.timeout == 30 after decode
+  <<: *defaults # merged: production.timeout == 30 after decode
   host: prod.example.com
 ```
 
@@ -238,16 +371,13 @@ All decoders enforce a maximum nesting depth of 100 levels and return an error i
 
 ### What a Round Trip Does Not Preserve
 
-Some of what one format writes has no counterpart in another. These are the cases where a value comes back in a different shape, all of them a property of the target format rather than of this library:
-
-- **A one-element list through XML.** One `<item>` element is indistinguishable from a single element, so it comes back as a value rather than a list. A list of two or more survives.
-- **An empty list or empty object through XML.** Both are written as an empty tag and come back as an empty object.
-- **`null` through XML.** XML has no null; the element is written empty and comes back as an empty object.
 - **Mixed content position.** Text interleaved with child elements is kept, but the text runs are written back before the child elements rather than between them.
 - **YAML anchor syntax.** Anchors and aliases are resolved on the way in, and merge keys (`<<`) are expanded in place. The values are correct; the syntax is not written back.
 - **XML comments and processing instructions.** Dropped during decode.
 
-JSON, XML and YAML each round-trip through the Node model unchanged within their own format, with the XML exceptions listed above.
+One thing to know about XML that this library did not write: a bare `<a/>` is read as an empty object, because without a marker there is nothing to say whether it was meant as a null, an empty string or an empty object.
+
+Everything else survives. JSON, XML and YAML each round-trip through the Node model unchanged, and a document converted to another format and back comes out as the document it started as.
 
 ## Package Structure
 
@@ -255,6 +385,8 @@ JSON, XML and YAML each round-trip through the Node model unchanged within their
   - Node structure for representing hierarchical data
   - Value types and type conversion operations
   - Tree traversal and manipulation functions
+  - Search: `Search`, `SearchFunc`, `Depths`, `Exists`, `GetNodeByPath`, `GetValueByPath`
+  - Edit: `Replace`, `ReplaceFunc`, `ReplaceText`, `Rename`, `Remove`, `SetByPath`, `RemoveByPath`
 - `tjson`: Handles JSON conversion operations
   - JSON encoding/decoding
   - JSON validation
@@ -319,6 +451,7 @@ if err := validateAndConvert(); err != nil {
 The library has comprehensive test coverage. You can use the following make commands to run tests:
 
 ### General Test Commands
+
 ```bash
 # Run all tests
 make test
@@ -334,6 +467,7 @@ make test-coverage-report
 ```
 
 ### Package Specific Tests
+
 ```bash
 # Run JSON tests
 make test-json
@@ -352,6 +486,7 @@ make test-bench
 ```
 
 ### Package Specific Coverage Reports
+
 ```bash
 # Run JSON tests with coverage
 make test-json-cover
@@ -371,6 +506,7 @@ Current test coverage: >90%
 ## Performance
 
 The library is optimized for:
+
 - Memory efficiency
 - CPU usage
 - Large file handling
@@ -394,6 +530,7 @@ BenchmarkLargeYAMLMarshal-8         2500            466568 ns/op         1581555
 ```
 
 #### Analysis
+
 - **JSON** shows the best performance in both marshaling and unmarshaling operations
   - Marshal: ~261 ns/op with only 2 allocations
   - Unmarshal: ~1.7 µs/op with 9 allocations
@@ -418,7 +555,6 @@ BenchmarkLargeYAMLMarshal-8         2500            466568 ns/op         1581555
 ## Contributing
 
 This project is open-source, and contributions are welcome. Feel free to contribute or provide feedback of any kind.
-
 
 ## License
 

@@ -7,13 +7,13 @@ Transformer, farklı veri formatları (JSON, XML, YAML) arasında dönüşüm ya
 ## Özellikler
 
 - JSON, XML ve YAML formatları arasında dönüşüm
-- Ortak veri yapısı ile tutarlı dönüşüm
-- Kolay kullanım
-- Tip güvenliği
-- Özelleştirilebilir dönüşüm kuralları
+- Anahtar sırası, değer tipleri ve tekrarlı elementler her dönüşümden sağ çıkar
+- Belgede anahtar arama: her eşleşmenin yolu ve derecesi ile birlikte
+- Bul değiştir: eşleşen her şeyi topluca ya da yolun adreslediği tek geçişi
+- Herhangi bir node veya değere yol ile erişim, array indeksleri dahil
+- Sayılar hiçbir zaman float64 üzerinden geçmez, uzun kimlikler her hanesini korur
 - Yüksek test kapsamı
-- İş parçacığı güvenli operasyonlar
-- Minimum bağımlılıklar
+- Tek bağımlılık: `gopkg.in/yaml.v3`
 
 ## Gereksinimler
 
@@ -165,6 +165,107 @@ node, _ := tyaml.DecodeYaml(yamlData)
 jsonData, _ := tjson.NodeToJson(node)
 ```
 
+## Belge Icinde Arama
+
+Node modelinin varlik sebebinin yarisi donusum. Digeri arama: buyuk bir belgede bir anahtar yirmi yerde gecebilir, hangisinin kastedildigini de yol soyler.
+
+```go
+matches, _ := transformer.SearchJson(data, "name")
+for _, m := range matches {
+    fmt.Println(m)
+}
+// root.meta.name (depth 2) = catalog
+// root.groups[0].members[0].name (depth 5) = alice
+// root.groups[0].members[0].profile.name (depth 6) = Alice Doe
+// root.deep[0][0].items[0].entries[0].detail.name (depth 9) = deepest
+```
+
+`SearchJson`, `SearchXml` ve `SearchYaml` decode ve aramayi tek cagriada yapar. Elinizde zaten bir agac varsa karsiligi `n.Search(key)`.
+
+Her `Match` uc sey tasir:
+
+- `Node` — eslesen node
+- `Path` — ona nasil ulasilacagi, aranan node'un kendi anahtariyla baslayarak: `root.groups[0].members[1].profile.name`
+- `Depth` — bu yolun kac adim oldugu. Dogrudan cocuk 1. derecededir, array indeksi de kendi basina bir adimdir.
+
+### Bir anahtar hangi derecelerde
+
+```go
+root.Depths("name")   // [1 2 3 4 5 6 7 8 9 10]
+```
+
+`Depths` bir anahtarin gectigi dereceleri artan sirada ve tekrarsiz verir; tek bir seviyede gecen anahtarla belgenin tamamina yayilan anahtar boylece ayirt edilir.
+
+### Degeri geri okumak
+
+Bir eslesmeden gelen yol `GetNodeByPath` ile geri okunur; `GetValueByPath` ise listenin icindeki, kendi node'u olmayan duz degerlere de ulasir:
+
+```go
+root.GetNodeByPath("root.groups[0].members[1].profile.name")   // *Node
+root.GetValueByPath("root.matrix[1][2]")                       // *Value, true
+root.GetValueByPath("root.cube[1][0][1]")                      // *Value, true
+```
+
+Icinde nokta ya da kose parantez gecen bir anahtar bu yolla adreslenemez; eslesmenin tasidigi `Node` kullanilir.
+
+### Baska olcutlerle arama
+
+```go
+// belgedeki her liste
+lists := root.SearchFunc(func(n *node.Node) bool { return n.Type() == node.TypeArray })
+
+// bu anahtar, listelerin ici dahil, herhangi bir yerde var mi
+root.Exists("milestones")   // true
+```
+
+Array'lerin ve array icindeki array'lerin icindeki anahtarlara da digerleri gibi ulasilir. Listenin icindeki duz bir degerin kendi node'u yoktur, dolayisiyla arama sonucu olamaz; listesi aranir ve degerler oradan okunur.
+
+
+## Belgeyi Degistirme
+
+Bir seyi bulmak isin genelde ilk yarisi. `EditJson`, `EditXml` ve `EditYaml` belgeyi cozer, agaci size verir ve sonucu geldigi formatta geri yazar:
+
+```go
+out, _ := transformer.EditJson(data, func(n *node.Node) {
+    n.ReplaceText("staging.example.com", "example.com")
+    n.Rename("labels", "tags")
+    n.Remove("debug")
+})
+```
+
+### Eslesen her seyi degistirmek
+
+| | |
+| --- | --- |
+| `Replace(key, value)` | o anahtara sahip her node'a degerin bir kopyasini verir |
+| `ReplaceFunc(predicate, replace)` | kabul edilen her node'u `replace`'e verir |
+| `Rename(oldKey, newKey)` | `oldKey` okunan her anahtari yeniden adlandirir |
+| `Remove(key)` | o anahtara sahip her obje uyesini siler |
+| `ReplaceText(old, new)` | listeler dahil her metin degerinin icindeki metni degistirir |
+
+Her biri kac node degistirdigini dondurur; hicbir seyle eslesmeyen bir degistirme sessiz kalmaz.
+
+Her hedef degerin kendi kopyasini alir, dolayisiyla sonuclardan birini degistirmek digerlerini degistirmez. `ReplaceText` yalnizca metne dokunur: ayni karakterleri iceren bir anahtar, sayi veya boolean oldugu gibi kalir; anahtarlari degistiren `Rename`'dir.
+
+### Tam olarak birini degistirmek
+
+Aramadan gelen bir yol tek bir node'u adresler; hepsini degil kastettiginiz tek gecisi degistirmenin yolu budur:
+
+```go
+matches := root.Search("name")
+root.SetByPath(matches[3].Path, &node.Value{Type: node.TypeString, Worth: "renamed"})
+```
+
+| | |
+| --- | --- |
+| `SetByPath(path, value)` | yolun adresledigi degeri degistirir; son segment olmayan bir anahtari adlandiriyorsa uyeyi ekler |
+| `RemoveByPath(path)` | bir obje uyesini ya da listeden bir elemani cikarir |
+
+Ikisi de yolun bir yere varip varmadigini bildirir. `SetByPath` liste elemanlarina da, liste icindeki listelere de ulasir (`root.matrix[1][2]`) ve bir liste elemanina verilen objeyi decoder'larin sardigi gibi sarar.
+
+Agac butun bunlar boyunca saglam kalir: herhangi birinden sonra `Validate` gecmeye devam eder ve belge uc formattan herhangi birinde geri yazilabilir.
+
+
 ## Format-Spesifik Davranislar
 
 ### Anahtar Sirasi
@@ -195,6 +296,38 @@ out, _ := transformer.XmlToJson([]byte(`<root id="5"><name lang="en">John</name>
 ```
 
 Ayni yapi geri donusturuldugunde orijinal XML elde edilir.
+
+### XML Tip Isaretleri
+
+JSON ve YAML'in yazabildigi birkac degerin XML'de kendine ait bir sekli yok. Bos bir etiket null da olabilir, bos string de, bos obje de; tek bir `<port>` element'i de tek bir deger olabilir, tek elemanli bir liste de. Sekil kaybolacak oldugunda yazici element'i kutuphanenin kendi namespace'inde isaretler, okuyucu da geri okur:
+
+```xml
+<n t:type="null"/>                          <!-- null -->
+<s t:type="string"/>                        <!-- bos string -->
+<a t:type="array"/>                         <!-- bos liste -->
+<a t:type="array"><item>80</item></a>       <!-- tek elemanli liste -->
+```
+
+Isaret yalnizca gerektigi yerde yazilir, namespace de yalnizca belge bir isaret kullaniyorsa root element'te bildirilir. Iki ve daha fazla elemanli duz listeler yine duz tekrarli element olarak gider; siradan belgeler isaretler eklenmeden onceki ciktinin aynisini verir.
+
+```go
+out, _ := transformer.JsonToXml([]byte(`{"ports":[80,443]}`))
+// <root><ports>80</ports><ports>443</ports></root>   isarete gerek yok
+
+out, _ = transformer.JsonToXml([]byte(`{"ports":[80]}`))
+// <root xmlns:t="..."><ports t:type="array"><item>80</item></ports></root>
+```
+
+### XML Element Adlari
+
+XML adlari serbest metin degildir: bir element `first name` ya da `1st` olarak adlandirilamaz. Gecerli bir ad olmayan anahtar cikista kacislanir, giriste geri okunur; boylece anahtar korunur ve belge gecerli kalir. Zaten gecerli olan adlar, ASCII disi olanlar dahil, oldugu gibi yazilir.
+
+```go
+out, _ := transformer.JsonToXml([]byte(`{"first name":"John","şehir":"İstanbul"}`))
+// <root><first_x0020_name>John</first_x0020_name><şehir>İstanbul</şehir></root>
+```
+
+Iki nokta ancak belge o prefix'i bildirmisse namespace prefix'i sayilir. `xmlns:soap` bildirimi yanindaki `soap:Envelope` prefix'li ad olarak kalir; icinde sadece iki nokta gecen bir anahtarin iki noktasi kacislanir, cunku onu prefix olarak yazmak hic bildirilmemis bir namespace'e atifta bulunurdu.
 
 ### XML Namespace'leri
 
@@ -228,7 +361,7 @@ defaults: &defaults
   timeout: 30
 
 production:
-  <<: *defaults   # birlestirilir: decode sonrasi production.timeout == 30
+  <<: *defaults # birlestirilir: decode sonrasi production.timeout == 30
   host: prod.example.com
 ```
 
@@ -238,16 +371,13 @@ Tum decoder'lar maksimum 100 seviye yuvalama derinligini zorunlu kilar ve asildi
 
 ### Round-Trip'te Korunmayanlar
 
-Bir formatin yazdigi her seyin digerinde karsiligi yoktur. Asagidaki durumlarda deger farkli bir sekilde geri gelir; hepsi hedef formatin bir ozelligidir, kutuphanenin degil:
-
-- **XML uzerinden tek elemanli liste.** Tek bir `<item>` element'i, tekil bir element'ten ayirt edilemez; bu yuzden liste degil deger olarak geri gelir. Iki ve daha fazla elemanli liste korunur.
-- **XML uzerinden bos liste veya bos obje.** Ikisi de bos etiket olarak yazilir ve bos obje olarak geri gelir.
-- **XML uzerinden `null`.** XML'de null yoktur; element bos yazilir ve bos obje olarak geri gelir.
 - **Karisik icerikte metin konumu.** Cocuk element'lerin arasina serpistirilmis metin korunur, ancak geri yazilirken cocuk element'lerin arasina degil oncesine yazilir.
 - **YAML anchor sozdizimi.** Anchor ve alias'lar giriste cozumlenir, merge key (`<<`) yerinde genisletilir. Degerler dogrudur, sozdizimi geri yazilmaz.
 - **XML yorum ve isleme talimatlari.** Decode sirasinda atilir.
 
-JSON, XML ve YAML'in her biri kendi formati icinde Node modelinden degismeden gecer; XML icin yukarida sayilan istisnalar gecerlidir.
+Bu kutuphanenin yazmadigi XML icin bilinmesi gereken bir sey var: isaretsiz bir `<a/>` bos obje olarak okunur, cunku isaret yokken onun null mi, bos string mi, bos obje mi kastedildigini soyleyecek bir sey yoktur.
+
+Bunlarin disindaki her sey korunur. JSON, XML ve YAML'in her biri Node modelinden degismeden gecer; baska bir formata cevrilip geri getirilen belge, basladigi belge olarak geri gelir.
 
 ## Paket Yapısı
 
@@ -255,6 +385,8 @@ JSON, XML ve YAML'in her biri kendi formati icinde Node modelinden degismeden ge
   - Hiyerarşik veriyi temsil eden Node yapısı
   - Değer tipleri ve tip dönüşüm operasyonları
   - Ağaç gezinme ve manipülasyon fonksiyonları
+  - Arama: `Search`, `SearchFunc`, `Depths`, `Exists`, `GetNodeByPath`, `GetValueByPath`
+  - Değiştirme: `Replace`, `ReplaceFunc`, `ReplaceText`, `Rename`, `Remove`, `SetByPath`, `RemoveByPath`
 - `tjson`: JSON dönüşüm işlemlerini gerçekleştirir
   - JSON kodlama/kod çözme
   - JSON doğrulama
@@ -319,6 +451,7 @@ if err := validateAndConvert(); err != nil {
 Kütüphane kapsamlı test kapsamına sahiptir. Testleri çalıştırmak için aşağıdaki make komutlarını kullanabilirsiniz:
 
 ### Genel Test Komutları
+
 ```bash
 # Tüm testleri çalıştır
 make test
@@ -334,6 +467,7 @@ make test-coverage-report
 ```
 
 ### Paket Özel Testler
+
 ```bash
 # JSON testlerini çalıştır
 make test-json
@@ -352,6 +486,7 @@ make test-bench
 ```
 
 ### Paket Özel Kapsam Raporları
+
 ```bash
 # JSON testlerini kapsam raporu ile çalıştır
 make test-json-cover
@@ -371,6 +506,7 @@ Mevcut test kapsamı: >90%
 ## Performans
 
 Kütüphane aşağıdaki konularda optimize edilmiştir:
+
 - Bellek verimliliği
 - CPU kullanımı
 - Büyük dosya işleme
@@ -394,6 +530,7 @@ BenchmarkLargeYAMLMarshal-8         2500            466568 ns/op         1581555
 ```
 
 #### Analiz
+
 - **JSON** hem marshal hem de unmarshal işlemlerinde en iyi performansı göstermektedir
   - Marshal: ~261 ns/op ve sadece 2 bellek tahsisi
   - Unmarshal: ~1.7 µs/op ve 9 bellek tahsisi
@@ -418,7 +555,6 @@ BenchmarkLargeYAMLMarshal-8         2500            466568 ns/op         1581555
 ## Katkıda Bulunma
 
 Bu proje açık kaynaklıdır ve katkılara açıktır. Her türlü katkıda bulunmaktan veya geri bildirimde bulunmaktan çekinmeyin.
-
 
 ## Lisans
 

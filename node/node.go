@@ -353,140 +353,6 @@ func (n *Node) Validate() error {
 	return nil
 }
 
-// GetNode searches for nodes with the given key in the entire node tree.
-// It performs a depth-first search through the tree, including:
-// - Direct children
-// - Nested objects
-// - Array items
-// Returns a slice of all matching nodes.
-func (n *Node) GetNode(key string) []*Node {
-	if n == nil {
-		return nil
-	}
-
-	var nodes []*Node
-	var search func(node *Node)
-
-	search = func(node *Node) {
-		if node == nil {
-			return
-		}
-
-		// Check current node
-		if node.Key == key {
-			nodes = append(nodes, node)
-		}
-
-		// Check node's value
-		if node.Value != nil {
-			// Check nested object
-			if node.Value.Type == TypeObject && node.Value.Node != nil {
-				search(node.Value.Node)
-			}
-
-			// Check array items
-			if node.Value.Type == TypeArray {
-				for _, item := range node.Value.Array {
-					if item != nil && item.Node != nil {
-						search(item.Node)
-					}
-				}
-			}
-		}
-
-		// Check next sibling
-		if node.Next != nil {
-			search(node.Next)
-		}
-	}
-
-	// Start search from root
-	search(n)
-	return nodes
-}
-
-// GetNodeByPath searches for a node using a path-like key.
-// The path format is dot-separated, e.g., "root.child.grandchild".
-// It traverses the tree following the path components.
-// Returns the first matching node or nil if not found.
-func (n *Node) GetNodeByPath(path string) *Node {
-	if n == nil || path == "" {
-		return nil
-	}
-
-	parts := strings.Split(path, ".")
-	current := n
-
-	for _, part := range parts {
-		found := false
-		for current != nil {
-			if current.Key == part {
-				found = true
-				if current.Value != nil && current.Value.Type == TypeObject {
-					current = current.Value.Node
-				}
-				break
-			}
-			current = current.Next
-		}
-		if !found {
-			return nil
-		}
-	}
-
-	return current
-}
-
-// FindNodes searches for nodes that match the given predicate function.
-// The predicate function should return true for nodes that match the search criteria.
-// It performs a depth-first search through the entire tree structure.
-// Returns a slice of all matching nodes.
-func (n *Node) FindNodes(predicate func(*Node) bool) []*Node {
-	if n == nil || predicate == nil {
-		return nil
-	}
-
-	var nodes []*Node
-	var search func(node *Node)
-
-	search = func(node *Node) {
-		if node == nil {
-			return
-		}
-
-		// Check current node
-		if predicate(node) {
-			nodes = append(nodes, node)
-		}
-
-		// Check node's value
-		if node.Value != nil {
-			// Check nested object
-			if node.Value.Type == TypeObject && node.Value.Node != nil {
-				search(node.Value.Node)
-			}
-
-			// Check array items
-			if node.Value.Type == TypeArray {
-				for _, item := range node.Value.Array {
-					if item != nil && item.Node != nil {
-						search(item.Node)
-					}
-				}
-			}
-		}
-
-		// Check next sibling
-		if node.Next != nil {
-			search(node.Next)
-		}
-	}
-
-	// Start search from root
-	search(n)
-	return nodes
-}
-
 // AddToNext adds a node as the next node
 func (n *Node) AddToNext(next *Node) error {
 	if n == nil {
@@ -513,7 +379,11 @@ func (n *Node) AddToPrev(prev *Node) error {
 	return nil
 }
 
-// Exists checks if a node with the given key exists in the tree
+// Exists reports whether this node or any node under it carries the given key.
+//
+// Keys inside arrays count. The earlier version of this only walked object
+// children, so a key that lived inside a list, which is where most of a
+// document's keys live, was reported as absent.
 func (n *Node) Exists(key string) bool {
 	if n == nil {
 		return false
@@ -521,48 +391,57 @@ func (n *Node) Exists(key string) bool {
 	if n.Key == key {
 		return true
 	}
-	if n.Value != nil && n.Value.Type == TypeObject && n.Value.Node != nil {
-		current := n.Value.Node
-		for current != nil {
-			if current.Exists(key) {
+	return existsUnder(n.Value, key, 0)
+}
+
+// existsUnder walks a value looking for the key, stopping at the first hit.
+func existsUnder(v *Value, key string, depth int) bool {
+	if v == nil || depth > maxSearchDepth {
+		return false
+	}
+
+	switch v.Type {
+	case TypeObject:
+		for child := v.Node; child != nil; child = child.Next {
+			if child.Key == key || existsUnder(child.Value, key, depth+1) {
 				return true
 			}
-			current = current.Next
+		}
+	case TypeArray:
+		for _, item := range v.Array {
+			if item == nil {
+				continue
+			}
+			if item.Node != nil {
+				// The element's own key belongs to the list above it, so only
+				// what is inside it counts.
+				if existsUnder(item.Node.Value, key, depth+1) {
+					return true
+				}
+				continue
+			}
+			if existsUnder(item, key, depth+1) {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-// Clone creates a deep copy of the node
+// Clone returns a deep copy of the node and of every sibling after it.
+//
+// The copy shares nothing with the original, so a value replaced in one is not
+// replaced in the other.
 func (n *Node) Clone() *Node {
 	if n == nil {
 		return nil
 	}
 	clone := &Node{
-		Key: n.Key,
+		Key:   n.Key,
+		Value: n.Value.Clone(),
 	}
-	if n.Value != nil {
-		clone.Value = &Value{
-			Type:  n.Value.Type,
-			Worth: n.Value.Worth,
-		}
-		if n.Value.Node != nil {
-			clone.Value.Node = n.Value.Node.Clone()
-		}
-		if n.Value.Array != nil {
-			clone.Value.Array = make([]*Value, len(n.Value.Array))
-			for i, v := range n.Value.Array {
-				if v != nil {
-					clone.Value.Array[i] = &Value{
-						Type:  v.Type,
-						Worth: v.Worth,
-					}
-					if v.Node != nil {
-						clone.Value.Array[i].Node = v.Node.Clone()
-					}
-				}
-			}
-		}
+	if clone.Value != nil && clone.Value.Node != nil {
+		clone.Value.Node.Parent = clone
 	}
 	if n.Next != nil {
 		clone.Next = n.Next.Clone()
@@ -571,59 +450,81 @@ func (n *Node) Clone() *Node {
 	return clone
 }
 
-// Equal checks if two nodes are equal
-func (n *Node) Equal(other *Node) bool {
-	if n == nil && other == nil {
-		return true
+// Clone returns a deep copy of the value.
+//
+// Lists inside lists are copied too. The earlier version copied only an
+// element's type, text and node, so a list of lists came back with its inner
+// lists emptied.
+func (v *Value) Clone() *Value {
+	if v == nil {
+		return nil
 	}
+	clone := &Value{
+		Type:  v.Type,
+		Worth: v.Worth,
+	}
+	if v.Node != nil {
+		clone.Node = v.Node.Clone()
+	}
+	if v.Array != nil {
+		clone.Array = make([]*Value, len(v.Array))
+		for i, item := range v.Array {
+			clone.Array[i] = item.Clone()
+			if clone.Array[i] != nil && clone.Array[i].Node != nil {
+				clone.Array[i].Node.Parent = nil
+			}
+		}
+	}
+	return clone
+}
+
+// Equal reports whether two nodes carry the same key and the same value.
+//
+// Siblings after the node are not part of the comparison, but the children
+// under it are, all of them: the earlier version compared only an object's
+// first child, which made {"a":1,"b":2} equal to {"a":1}.
+func (n *Node) Equal(other *Node) bool {
 	if n == nil || other == nil {
-		return false
+		return n == other
 	}
 	if n.Key != other.Key {
 		return false
 	}
-	if n.Value == nil && other.Value == nil {
-		return true
+	return n.Value.Equal(other.Value)
+}
+
+// Equal reports whether two values hold the same data, all the way down.
+func (v *Value) Equal(other *Value) bool {
+	if v == nil || other == nil {
+		return v == other
 	}
-	if n.Value == nil || other.Value == nil {
+	if v.Type != other.Type || v.Worth != other.Worth {
 		return false
 	}
-	if n.Value.Type != other.Value.Type {
+	if !siblingsEqual(v.Node, other.Node) {
 		return false
 	}
-	if n.Value.Worth != other.Value.Worth {
+	if len(v.Array) != len(other.Array) {
 		return false
 	}
-	if n.Value.Node != nil {
-		if !n.Value.Node.Equal(other.Value.Node) {
+	for i := range v.Array {
+		if !v.Array[i].Equal(other.Array[i]) {
 			return false
-		}
-	}
-	if n.Value.Array != nil {
-		if len(n.Value.Array) != len(other.Value.Array) {
-			return false
-		}
-		for i := range n.Value.Array {
-			if n.Value.Array[i] == nil && other.Value.Array[i] == nil {
-				continue
-			}
-			if n.Value.Array[i] == nil || other.Value.Array[i] == nil {
-				return false
-			}
-			if n.Value.Array[i].Type != other.Value.Array[i].Type {
-				return false
-			}
-			if n.Value.Array[i].Worth != other.Value.Array[i].Worth {
-				return false
-			}
-			if n.Value.Array[i].Node != nil {
-				if !n.Value.Array[i].Node.Equal(other.Value.Array[i].Node) {
-					return false
-				}
-			}
 		}
 	}
 	return true
+}
+
+// siblingsEqual compares two chains of nodes, both what they hold and how many
+// of them there are.
+func siblingsEqual(a, b *Node) bool {
+	for a != nil && b != nil {
+		if !a.Equal(b) {
+			return false
+		}
+		a, b = a.Next, b.Next
+	}
+	return a == nil && b == nil
 }
 
 // String returns a string representation of the node
